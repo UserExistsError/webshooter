@@ -10,26 +10,26 @@ const puppeteer = require('puppeteer');
     const page = await browser.newPage();
     var success = false;
     try {
-        await page.goto('::URL::', {
+        await page.goto('{{ url }}', {
             waitUntil: 'load',
-            timeout: ::TIMEOUT::
+            timeout: {{ timeout }}
         });
         success = true;
-    } catch {
+    } catch (e) {
     }
     if (!success) {
         try {
-            await page.goto('::URL::', {
+            await page.goto('{{ url }}', {
                 waitUntil: 'domcontentloaded',
-                timeout: ::TIMEOUT::
+                timeout: {{ timeout }}
             });
             success = true;
-        } catch {
+        } catch (e) {
         }
     }
     if (success) {
         await page.screenshot({
-            path: '::IMAGE::',
+            path: '{{ image }}',
             //fullPage: true
             clip: {
                 x: 0,

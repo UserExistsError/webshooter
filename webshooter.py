@@ -2,7 +2,7 @@
 import argparse
 import logging
 
-import urls.nmap
+import targets.nmap
 import report.generate
 import screen.shoot
 import screen.session
@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_HTTP_PORTS = [80, 8080]
 DEFAULT_HTTPS_PORTS = [443, 8443]
+
+def split_ports(ports):
+    return list(map(int, ports.split(',')))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -23,16 +26,17 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--threads', default=10, type=int, help='worker thread count')
     parser.add_argument('-p', '--page-size', dest='page_size', default=40, type=int, help='results per page')
     parser.add_argument('-s', '--session', required=True, help='save progress')
-    parser.add_argument('--http-ports', dest='http_ports', default=','.join(map(str, DEFAULT_HTTP_PORTS)),
-                                                                            help='comma-separated')
-    parser.add_argument('--https-ports', dest='https_ports', default=','.join(map(str, DEFAULT_HTTPS_PORTS)),
-                                                                            help='comma-separated')
+    parser.add_argument('-r', '--retry', action='store_true', help='retry failed urls')
+    parser.add_argument('--http-ports', dest='http_ports', default=DEFAULT_HTTP_PORTS,
+                        type=split_ports, help='comma-separated')
+    parser.add_argument('--https-ports', dest='https_ports', default=DEFAULT_HTTPS_PORTS,
+                        type=split_ports, help='comma-separated')
     args = parser.parse_args()
 
     if args.debug:
         h = logging.StreamHandler()
         h.setFormatter(logging.Formatter('[%(levelname)s] %(filename)s:%(lineno)s %(message)s'))
-        for n in [__name__, 'js', 'urls', 'report', 'screen']:
+        for n in [__name__, 'js', 'targets', 'report', 'screen']:
             l = logging.getLogger(n)
             l.setLevel(logging.DEBUG)
             l.addHandler(h)
@@ -40,13 +44,15 @@ if __name__ == '__main__':
     # get urls to screenshot
     urls = set(args.urls)
     if args.url_file:
-        s.update([u.strip() for u in open(args.url_file)])
+        urls.update([u.strip() for u in open(args.url_file)])
     if args.nmap_xml:
-        s.update(urls.nmap.from_xml(args.nmap_xml, args.http_ports, args.https_ports))
+        urls.update(targets.nmap.from_xml(args.nmap_xml, args.http_ports, args.https_ports))
 
     # shoot the pages and generate html report
     session = screen.session.WebShooterSession(args.session, urls)
     urls = session.get_queued_urls()
+    if args.retry:
+        urls.extend(session.get_failed_urls())
     print('shooting {} url(s)'.format(len(urls)))
     if screen.shoot.from_urls(urls, args.threads, args.timeout, args.node_path, session):
         report.generate.from_session(session, args.page_size)

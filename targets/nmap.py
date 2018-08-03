@@ -8,7 +8,7 @@ def from_xml(xml_file, http_ports, https_ports):
     for host in scan.findall('./host'):
         open_ports = [int(p.get('portid')) for p in host.findall('./ports/port') if p.find('state').get('state') == 'open']
         for p in open_ports:
-            addr = host.findall('./address')[0].get('addr')[0]
+            addr = host.findall('./address')[0].get('addr')
             if p in http_ports:
                 urls.add('http://{}:{}'.format(addr, p))
             if p in https_ports:

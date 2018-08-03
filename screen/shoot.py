@@ -1,12 +1,14 @@
 import os
 import re
 import ssl
+import json
 import logging
 import urllib.error
 import urllib.request
 import concurrent.futures
 
 import js.script
+from screen.session import Status
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +26,19 @@ def http_get(url, timeout):
     return urllib.request.urlopen(req, timeout=timeout, context=ctx)
 
 def shoot_thread(url, timeout, node_path, session):
-    # get screenshot
-    js_file, img_file = js.script.build(url, timeout)
-    logger.debug('Taking screenshot: '+url)
-    js.script.run(js_file, node_path)
-    os.unlink(js_file)
-    if not os.path.exists(img_file):
-        logger.error('Screenshot failed: '+url)
-        return
-    if os.path.getsize(img_file) == 0:
-        logger.error('Screenshot failed: '+url)
-        os.unlink(img_file)
-        return
     # get http response object
     try:
         resp = http_get(url, timeout)
     except urllib.error.HTTPError as e:
+        logger.error('Error GET {}: {}'.format(url, str(e)))
         resp = e
     except urllib.error.URLError as e:
         logger.error('Error GET {}: {}'.format(url, str(e)))
-        session.update_url(url, 2)
+        session.update_url(url, Status.INVALID)
+        return
+    except Exception as e:
+        logger.error('Error GET {}: {}'.format(url, str(e)))
+        session.update_url(url, Status.INVALID)
         return
     title = ''
     m = title_regex.search(resp.read())
@@ -55,13 +50,30 @@ def shoot_thread(url, timeout, node_path, session):
             server = v
             break
     logger.debug('[{}] GET {} : title="{}", server="{}"'.format(resp.getcode(), resp.geturl(), title, server))
+
+    # get screenshot
+    js_file, img_file = js.script.build(url, timeout)
+    logger.debug('Taking screenshot: '+url)
+    js.script.run(js_file, node_path)
+    os.unlink(js_file)
+    if not os.path.exists(img_file):
+        logger.error('Screenshot failed: '+url)
+        session.update_url(url, Status.ERROR)
+        return
+    if os.path.getsize(img_file) == 0:
+        logger.error('Screenshot failed: '+url)
+        os.unlink(img_file)
+        session.update_url(url, Status.ERROR)
+        return
+
     screen = {
         'url': url,
         'url_final': resp.geturl(),
         'title': title,
         'server': server,
         'status': resp.getcode(),
-        'image': img_file
+        'image': img_file,
+        'headers': json.dumps(resp.getheaders())
     }
     try:
         session.add_screen(screen)

@@ -26,7 +26,7 @@ def from_session(session, page_size):
         pageno_next = (pageno+1) % len(pages)
         rows = results[i:i+page_size]
         pages_index = [{'href': p, 'number':i} for i, p in enumerate(pages)]
-        page = report.template.populate('Page {}'.format(pageno), rows,
+        page = report.template.populate('Page {}'.format(pageno), rows, len(results),
                                         pages_index, pageno, pageno_prev, pageno_next)
         logger.debug('Generating page {}'.format(pageno))
         open(pages[pageno], 'w').write(page)
