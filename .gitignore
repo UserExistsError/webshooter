@@ -1,6 +1,3 @@
-# Me
-*.pcap
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -92,3 +89,7 @@ ENV/
 .ropeproject
 
 *.png
+*.bak
+script.*.js
+page.*.html
+index.html

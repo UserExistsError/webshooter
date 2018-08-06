@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const devices = require('puppeteer/DeviceDescriptors');
 
 (async () => {
     const browser = await puppeteer.launch({
@@ -8,25 +9,23 @@ const puppeteer = require('puppeteer');
         defaultViewport: {width: 1400, height: 900}
     });
     const page = await browser.newPage();
-    var success = false;
-    try {
-        await page.goto('{{ url }}', {
-            waitUntil: 'load',
-            timeout: {{ timeout }}
-        });
-        success = true;
-    } catch (e) {
+    if ({{ mobile }}) {
+        page.emulate(devices['iPhone 6']);
     }
-    if (!success) {
+    var success = false;
+    var waitEvents = ['load', 'domcontentloaded', 'networkidle2'];
+    for (i = 0; i < waitEvents.length; i++) {
         try {
             await page.goto('{{ url }}', {
-                waitUntil: 'domcontentloaded',
+                waitUntil: waitEvents[i],
                 timeout: {{ timeout }}
             });
             success = true;
+            break;
         } catch (e) {
         }
     }
+
     if (success) {
         await page.screenshot({
             path: '{{ image }}',

@@ -6,20 +6,26 @@
 
     <style>
       .collapsible {
-      cursor: pointer;
-      width: 100%;
-      border: none;
-      text-align: left;
-      outline: none;
-      font-size: 15px;
+          cursor: pointer;
+          width: 100%;
+          border: none;
+          text-align: left;
+          outline: none;
+          font-size: 15px;
       }
 
       .http-headers {
-      padding: 0 18px;
-      display: none;
-      overflow: hidden;
-      word-break: break-all;
+          display: none;
+          overflow: hidden;
+          word-break: break-all;
       }
+
+      .trunc {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+      }
+
     </style>
   </head>
   <body>
@@ -68,7 +74,7 @@
             </li>
             {% for p in pages %}
             {% if pageno == loop.index - 1 %}
-            <li class="page-item active"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
+            <li class="page-item  active"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
             {% else %}
             <li class="page-item"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
             {% endif %}
@@ -80,39 +86,36 @@
         </nav>
 
         <!-- add screen shots, 1 per row -->
-        {% for r in rows %}
-        <div class="container-fluid py-0">
-          <div class="row p-1" id="{{ r.id }}">
-            <div class="col-md-3 p-1 bg-secondary">
-              <a href="{{ r.image }}" target="_blank" rel="noopener noreferrer">
-                <img src="{{ r.image }}" class="w-100 border-0 bg-light"/>
-              </a>
-            </div>
+        <div class="container-fluid">
+          <div class="row">
+            {% for r in rows %}
 
-            <div class="col-md-8 p-1 ml-1 bg-secondary">
-              <div class="bg-light h-100 p-2">
-                  <table class="table table-sm table-striped">
-                    <tbody>
-                      <tr><td><h4><a class="nav-link" href="{{ r.url_final }}" target="_blank" rel="noopener noreferrer">{{ r.url_final }}</a></h4></td></tr>
-                      <tr><td><b>Title</b>: {{ r.title }}</td></tr>
-                      <tr><td><b>Server</b>: {{ r.server }}</td></tr>
-                      <tr><td><b>Status</b>: {{ r.status }}</td></tr>
-                      <tr><td><b>Original Url</b>: <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.url }}</a></td></tr>
-                      <tr><td>
-                          <button class="collapsible btn btn-primary" onclick="toggleHeaders('headers-row-{{ loop.index }}')">Headers</button>
-                      </td></tr>
-                      {% set row_number = loop.index %}
-                      {% for h, v in r.headers %}
-                      <tr><td class="http-headers headers-row-{{ row_number }}"><b>{{ h }}</b>: {{ v }}</td></tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
+            <div class="card col-3 p-1 border border-secondary" id="{{ r.id }}">
+
+              <a href="{{ r.image }}" target="_blank" rel="noopener noreferrer">
+                <img src="{{ r.image }}" class="card-img-top border border-primary"/>
+              </a>
+              
+              <div class="py-1 h-100 bg-lite">
+
+                <h6 class="text-truncate"><a class="nav-link p-0" href="{{ r.url_final }}" target="_blank" rel="noopener noreferrer">{{ r.url_final }}</a></h6>
+                <h6 class="text-truncate"><b>Title</b>: {{ r.title }}</h6>
+                <h6 class="text-truncate"><b>Server</b>: {{ r.server }}</h6>
+                <h6 class="text-truncate"><b>Status</b>: {{ r.status }}</h6>
+                <h6 class="text-truncate"><b>Original Url</b>: <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.url }}</a></h6>
+                <button class="collapsible btn btn-primary" onclick="toggleHeaders('headers-row-{{ loop.index }}')">Headers</button>
+                {% set row_number = loop.index %}
+                {% for h, v in r.headers %}
+                <h6 class="http-headers headers-row-{{ row_number }}"><b>{{ h }}</b>: {{ v }}</h6>
+                {% endfor %}
+                
               </div>
-            </div>
+            </div> <!-- end card -->
+            {% endfor %}
           </div>
         </div>
-        {% endfor %}
 
+        <!-- bottom index -->
         <nav aria-label="Page Index">
           <ul class="pagination">
             <li class="page-item">
