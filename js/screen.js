@@ -6,9 +6,10 @@ const devices = require('puppeteer/DeviceDescriptors');
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
         ignoreHTTPSErrors: true,
         headless: true,
-        defaultViewport: {width: 1400, height: 900}
+        defaultViewport: {width: 1000, height: 600}
     });
     const page = await browser.newPage();
+    page.setExtraHTTPHeaders({{ headers }});
     if ({{ mobile }}) {
         page.emulate(devices['iPhone 6']);
     }

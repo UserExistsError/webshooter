@@ -3,109 +3,90 @@
   <head>
     <title>{{ title }}</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-
-    <style>
-      .collapsible {
-          cursor: pointer;
-          width: 100%;
-          border: none;
-          text-align: left;
-          outline: none;
-          font-size: 15px;
-      }
-
-      .http-headers {
-          display: none;
-          overflow: hidden;
-          word-break: break-all;
-      }
-
-      .trunc {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-      }
-
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <script src="web.js"></script>
   </head>
-  <body>
-    <script>
-      document.onkeydown = function (e) {
-          e = e || window.event;
-          if (e.keyCode == '37') { //left
-              document.getElementById('prev-page').click();
-          }
-          else if (e.keyCode == '39') { //right
-              document.getElementById('next-page').click();
-          }
-      }
 
-      function toggleHeader (header) {
-          if (header.style.display == 'block') {
-              header.style.display = 'none';
-          }
-          else {
-              header.style.display = 'block';
-          }
-      }
-
-      function toggleHeaders (name) {
-          var headers = document.getElementsByClassName(name);
-          for (var i = 0; i < headers.length; i++) {
-              toggleHeader(headers[i]);
-          }
-      }
-
-      function toggleAllHeaders () {
-          var headers = document.getElementsByClassName('http-headers');
-          for (var i = 0; i < headers.length; i++) {
-              toggleHeader(headers[i]);
-          }
-      }
-    </script>
+  <body onload="centerNav();">
     <div class="album text-muted">
       <div class="container-fluid">
 
         <!-- Build page index -->
         <nav aria-label="Page Index">
-          <ul class="pagination">
+          <ul class="pagination pagination-sm">
+
+            <!-- Previous button -->
+            {% if pageno == 0 %}
+            <li class="page-item disabled">
+              <a class="page-link" id="prev-page">Prev</a>
+              {% else %}
             <li class="page-item">
-              <a class="page-link" id="prev-page" href="{{ pages[pageno_prev]['href'] }}">Prev</a>
+              <a class="page-link" id="prev-page" href="{{ page_prev }}">Prev</a>
+              {% endif %}
             </li>
-            {% for p in pages %}
-            {% if pageno == loop.index - 1 %}
-            <li class="page-item  active"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
-            {% else %}
-            <li class="page-item"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
-            {% endif %}
-            {% endfor %}
+
+            <!-- First page button -->
+            {% if pageno == 0 %}
+            <li class="page-item disabled">
+              {% else %}
             <li class="page-item">
-              <a class="page-link" id="next-page" href="{{ pages[pageno_next]['href'] }}">Next</a>
+              {% endif %}
+              <a class="page-link" id="first-page" href="{{ pages[0] }}">First</a>
             </li>
+
+            <ul class="pagination pagination-sm" id="nav-top" style="overflow-x: scroll;">
+              {% for p in pages_index %}
+              {% if pageno == p['number'] %}
+              <li class="page-item active" style="margin: auto;"><a class="page-link page-li" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
+              {% else %}
+              <li class="page-item"><a class="page-link page-li" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
+              {% endif %}
+              {% endfor %}
+            </ul>
+
+            <!-- Last page button -->
+            {% if pageno == pages|length - 1 %}
+            <li class="page-item disabled">
+              {% else %}
+            <li class="page-item">
+              {% endif %}
+              <a class="page-link" id="last-page" href="{{ pages[-1] }}">Last</a>
+            </li>
+
+            <!-- Next page button -->
+            {% if pageno == pages|length - 1 %}
+            <li class="page-item disabled">
+              <a class="page-link" id="next-page">Next</a>
+              {% else %}
+            <li class="page-item">
+              <a class="page-link" id="next-page" href="{{ page_next }}">Next</a>
+              {% endif %}
+            </li>
+
           </ul>
         </nav>
 
         <!-- add screen shots, 1 per row -->
         <div class="container-fluid">
           <div class="row">
-            {% for r in rows %}
+            {% for s in screens %}
 
-            <div class="card col-3 p-1 border border-secondary" id="{{ r.id }}">
+            <div class="card col-3 p-1 border border-secondary" id="{{ s.id }}">
 
-              <a href="{{ r.image }}" target="_blank" rel="noopener noreferrer">
-                <img src="{{ r.image }}" class="card-img-top border border-primary"/>
+              <a href="{{ s.image }}" target="_blank" rel="noopener noreferrer">
+                <img src="{{ s.image }}" class="card-img-top border border-primary"/>
               </a>
               
               <div class="py-1 h-100 bg-lite">
 
-                <h6 class="text-truncate"><a class="nav-link p-0" href="{{ r.url_final }}" target="_blank" rel="noopener noreferrer">{{ r.url_final }}</a></h6>
-                <h6 class="text-truncate"><b>Title</b>: {{ r.title }}</h6>
-                <h6 class="text-truncate"><b>Server</b>: {{ r.server }}</h6>
-                <h6 class="text-truncate"><b>Status</b>: {{ r.status }}</h6>
-                <h6 class="text-truncate"><b>Original Url</b>: <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.url }}</a></h6>
+                <h6 class="text-truncate"><a class="nav-link p-0" href="{{ s.url_final }}" target="_blank" rel="noopener noreferrer">{{ s.url_final }}</a></h6>
+                <h6 class="text-truncate"><b>Title</b>: {{ s.title }}</h6>
+                <h6 class="text-truncate"><b>Server</b>: {{ s.server }}</h6>
+                <h6 class="text-truncate"><b>Status</b>: {{ s.status }}</h6>
+                <h6 class="text-truncate"><b>Original Url</b>: <a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.url }}</a></h6>
                 <button class="collapsible btn btn-primary" onclick="toggleHeaders('headers-row-{{ loop.index }}')">Headers</button>
                 {% set row_number = loop.index %}
-                {% for h, v in r.headers %}
+                {% for h, v in s.headers %}
                 <h6 class="http-headers headers-row-{{ row_number }}"><b>{{ h }}</b>: {{ v }}</h6>
                 {% endfor %}
                 
@@ -115,24 +96,6 @@
           </div>
         </div>
 
-        <!-- bottom index -->
-        <nav aria-label="Page Index">
-          <ul class="pagination">
-            <li class="page-item">
-              <a class="page-link" href="{{ pages[pageno_prev]['href'] }}">Prev</a>
-            </li>
-            {% for p in pages %}
-            {% if pageno == loop.index - 1 %}
-            <li class="page-item  active"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
-            {% else %}
-            <li class="page-item"><a class="page-link" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
-            {% endif %}
-            {% endfor %}
-            <li class="page-item">
-              <a class="page-link" href="{{ pages[pageno_next]['href'] }}">Next</a>
-            </li>
-          </ul>
-        </nav>
       </div>
     </div>
   </body>

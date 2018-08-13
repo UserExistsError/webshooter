@@ -1,17 +1,23 @@
 import os
-import sys
 import string
 import jinja2
 
 class Template:
-    Lines=os.path.join(os.path.dirname(sys.argv[0]), 'report/page_template.html')
-    Tiles=os.path.join(os.path.dirname(sys.argv[0]), 'report/card_template.html')
-    Index=os.path.join(os.path.dirname(sys.argv[0]), 'report/index_template.html')
+    Lines=os.path.join(os.path.dirname(__file__), 'page_template.html')
+    Tiles=os.path.join(os.path.dirname(__file__), 'card_template.html')
+    Index=os.path.join(os.path.dirname(__file__), 'index_template.html')
 
-def populate(template, title, rows, count, pages, pageno, pageno_prev, pageno_next):
+def populate(template, title, screens, count, pages_index, pageno, page_prev, page_next, pages):
     html = jinja2.Template(open(template, 'rb').read().decode())
-    return html.render(title=title, rows=rows, count=count, pages=pages, pageno=pageno,
-                       pageno_prev=pageno_prev, pageno_next=pageno_next)
+    return html.render(
+        title=title,
+        screens=screens,
+        count=count,
+        pages_index=pages_index,
+        pageno=pageno,
+        page_prev=page_prev,
+        page_next=page_next,
+        pages=pages)
 
 def populate_index(template, index):
     html = jinja2.Template(open(template, 'rb').read().decode())

@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import jinja2
 import logging
 import tempfile
@@ -8,13 +9,14 @@ import subprocess
 logger = logging.getLogger(__name__)
 
 # javascript to pass to node and take a screen shot
-JS_TEMPLATE_FILE=os.path.join(os.path.dirname(sys.argv[0]), 'js/screen.js')
+JS_TEMPLATE_FILE=os.path.join(os.path.dirname(__file__), 'screen.js')
 
-def build(url, timeout=5000, mobile=False):
+def build(url, timeout=5000, mobile=False, headers={}):
     js_tmp = tempfile.mkstemp(prefix='script.', suffix='.js', dir='.')[-1]
     img_tmp = tempfile.mkstemp(prefix='screen.', suffix='.png', dir='.')[-1]
     script = jinja2.Template(open(JS_TEMPLATE_FILE, 'rb').read().decode())
-    rendered = script.render(url=url, image=img_tmp, timeout=timeout, mobile=str(mobile).lower())
+    rendered = script.render(url=url, image=img_tmp, timeout=timeout, mobile=str(mobile).lower(),
+                             headers=json.dumps(headers))
     open(js_tmp, 'wb').write(rendered.encode())
     return js_tmp, img_tmp
 
