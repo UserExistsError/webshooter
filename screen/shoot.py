@@ -45,14 +45,14 @@ def shoot_thread(url, timeout, node_path, session, mobile, creds):
         try:
             resp = urllib.request.urlopen(req, timeout=timeout, context=ctx)
         except urllib.error.HTTPError as e:
-            logger.error('GET {}: {}'.format(url, str(e)))
+            logger.error('GET {} - {}'.format(url, str(e)))
             resp = e
         except urllib.error.URLError as e:
-            logger.error('GET {}: {}'.format(url, str(e)))
+            logger.error('GET {} - {}'.format(url, str(e)))
             session.update_url(url, Status.INVALID)
             return
         except Exception as e:
-            logger.error('GET {}: {}'.format(url, str(e)))
+            logger.error('GET {} - {}'.format(url, str(e)))
             session.update_url(url, Status.INVALID)
             return
 
@@ -117,6 +117,7 @@ def shoot_thread(url, timeout, node_path, session, mobile, creds):
         'image': os.path.basename(img_file),
         'headers': json.dumps(sorted(resp.getheaders(), key=lambda t: t[0].lower()))
     })
+
     try:
         session.add_screen(screen)
     except Exception as e:

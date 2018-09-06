@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import json
-import argparse
 import logging
+import netaddr
+import argparse
 
 import targets.nmap
 import report.generate
@@ -17,11 +18,32 @@ DEFAULT_HTTPS_PORTS = [443, 8443]
 def split_ports(ports):
     return list(map(int, ports.split(',')))
 
+def expand_cidr(cidr):
+    n = netaddr.IPNetwork(cidr)
+    return [str(a) for a in n.iter_hosts()]
+
+def process_url(url):
+    if url.startswith('http'):
+        return [url]
+    try:
+        return expand_cidr(url)
+    except:
+        pass
+    # probably a url w/o scheme
+    return [url]
+
 def handle_scan(args):
     # get urls to screenshot
-    urls_raw = set(args.urls)
+    if args.all_open:
+        args.ports_http = list(range(2**16))
+        args.ports_https = list(range(2**16))
+
+    urls_raw = set()
+    for u in args.urls:
+        urls_raw.update(process_url(u.strip()))
     if args.url_file:
-        urls_raw.update([u.strip() for u in open(args.url_file)])
+        for u in open(args.url_file):
+            urls_raw.update(process_url(u.strip()))
     if args.nmap_xml:
         urls_raw.update(targets.nmap.from_xml(args.nmap_xml, args.ports_http, args.ports_https))
     urls = set()
@@ -79,6 +101,7 @@ if __name__ == '__main__':
                         type=split_ports, help='comma-separated')
     scan_parser.add_argument('--ports-https', dest='ports_https', default=DEFAULT_HTTPS_PORTS,
                         type=split_ports, help='comma-separated')
+    scan_parser.add_argument('--all-open', dest='all_open', action='store_true', help='scan all open ports')
     scan_parser.add_argument('urls', default=[], nargs='*', help='urls including scheme')
 
     # report

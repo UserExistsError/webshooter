@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 JS_TEMPLATE_FILE=os.path.join(os.path.dirname(__file__), 'screen.js')
 
 def build(url, timeout=5000, mobile=False, headers={}):
-    js_tmp = tempfile.mkstemp(prefix='script.', suffix='.js', dir='.')[-1]
-    img_tmp = tempfile.mkstemp(prefix='screen.', suffix='.png', dir='.')[-1]
+    js_h, js_tmp = tempfile.mkstemp(prefix='script.', suffix='.js', dir='.')
+    os.close(js_h)
+    img_h, img_tmp = tempfile.mkstemp(prefix='screen.', suffix='.png', dir='.')
+    os.close(img_h)
     script = jinja2.Template(open(JS_TEMPLATE_FILE, 'rb').read().decode())
     rendered = script.render(url=url, image=img_tmp, timeout=timeout, mobile=str(mobile).lower(),
                              headers=json.dumps(headers))

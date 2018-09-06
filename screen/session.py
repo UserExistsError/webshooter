@@ -13,16 +13,17 @@ class Status:
     INVALID=3
 
 class WebShooterSession():
+    local = threading.local()
     def __init__(self, session_file, urls=[]):
+        self.connections = 0
         self.session_file = session_file
-        self.local = None
         if not os.path.exists(session_file):
             logger.info('Creating new session file: '+session_file)
         self.init_db(urls)
     def get_conn(self):
         if not getattr(self.local, 'conn', None):
-            self.local = threading.local()
             self.local.conn = sqlite3.connect(self.session_file)
+            self.connections += 1
         return self.local.conn
     def init_db(self, urls):
         conn = self.get_conn()
