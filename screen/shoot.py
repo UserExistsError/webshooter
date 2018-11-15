@@ -28,7 +28,7 @@ def http_get(url, timeout, user_agent):
     req = urllib.request.Request(url, headers={'User-Agent': user_agent})
     return urllib.request.urlopen(req, timeout=timeout, context=ctx)
 
-def shoot_thread(url, timeout, node_path, session, mobile, creds):
+def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -97,13 +97,13 @@ def shoot_thread(url, timeout, node_path, session, mobile, creds):
     js_file, img_file = js.script.build(resp.geturl(), timeout * 1000, mobile, headers)
     logger.info('Taking screenshot: '+resp.geturl())
     js.script.run(js_file, node_path)
-    os.unlink(js_file)
+    #os.unlink(js_file)
     if not os.path.exists(img_file):
-        logger.error('Screenshot failed: '+resp.geturl())
+        logger.error('Screenshot failed: {}'.format(resp.geturl() or 'error'))
         session.update_url(url, Status.ERROR)
         return
     if os.path.getsize(img_file) == 0:
-        logger.error('Screenshot failed: '+resp.geturl())
+        logger.error('Screenshot failed: '.format(resp.geturl() or 'error'))
         os.unlink(img_file)
         session.update_url(url, Status.ERROR)
         return
@@ -124,20 +124,20 @@ def shoot_thread(url, timeout, node_path, session, mobile, creds):
         logger.error('Failed to add screenshot: '+str(e))
 
 
-def shoot_thread_wrapper(url, timeout, node_path, session, mobile, creds):
+def shoot_thread_wrapper(url, timeout, screen_wait_ms, node_path, session, mobile, creds):
     try:
-        shoot_thread(url, timeout, node_path, session, mobile, creds)
+        shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds)
     except Exception as e:
         logger.error('Failed on {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
 
-def from_urls(urls, threads, timeout, node_path, session, mobile, creds=None):
+def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile, creds=None):
     if len(urls) == 0:
         return
     work = []
     logger.debug('Scanning with {} workers'.format(threads))
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as e:
-        work = [e.submit(shoot_thread_wrapper, u, timeout, node_path, session, mobile, creds) for u in urls]
+        work = [e.submit(shoot_thread_wrapper, u, timeout, screen_wait_ms, node_path, session, mobile, creds) for u in urls]
         logger.debug('Waiting for workers to finish')
         try:
             while len(work):

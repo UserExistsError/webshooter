@@ -65,7 +65,7 @@ def handle_scan(args):
         creds = json.loads(open(args.creds).read())
 
     print('Shooting {} url(s)'.format(len(urls)))
-    screen.shoot.from_urls(urls, args.threads, args.timeout, args.node_path, session, args.mobile, creds)
+    screen.shoot.from_urls(urls, args.threads, args.timeout, args.screen_wait, args.node_path, session, args.mobile, creds)
 
 def handle_report(args):
     template = Template.Tiles if args.tiles else Template.Lines
@@ -94,6 +94,7 @@ if __name__ == '__main__':
     scan_parser.add_argument('-n', '--node-path', dest='node_path', default='node', help='nodejs path')
     scan_parser.add_argument('-t', '--timeout', default=5, type=int, help='timeout in seconds')
     scan_parser.add_argument('-w', '--threads', default=10, type=int, help='worker thread count')
+    scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait', default=2000, type=int, help='wait in millisecs between page load and screenshot')
     scan_parser.add_argument('--mobile', action='store_true', help='Emulate mobile device')
     scan_parser.add_argument('-r', '--retry', action='store_true', help='retry failed urls')
     scan_parser.add_argument('-c', '--creds', help='json file for basic auth: [["user", "pass"], ...]')
