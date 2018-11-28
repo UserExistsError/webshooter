@@ -97,7 +97,7 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
     js_file, img_file = js.script.build(resp.geturl(), timeout * 1000, mobile, headers)
     logger.info('Taking screenshot: '+resp.geturl())
     js.script.run(js_file, node_path)
-    #os.unlink(js_file)
+    os.unlink(js_file)
     if not os.path.exists(img_file):
         logger.error('Screenshot failed: {}'.format(resp.geturl() or 'error'))
         session.update_url(url, Status.ERROR)
