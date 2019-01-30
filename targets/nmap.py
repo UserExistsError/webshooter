@@ -11,12 +11,12 @@ def from_xml(xml_file, http_ports, https_ports):
             addr = host.findall('./address')[0].get('addr')
             if p in http_ports:
                 if p == 80:
-                    urls.add('http://{}'.format(addr))
+                    urls.add('http://{}/'.format(addr))
                 else:
-                    urls.add('http://{}:{}'.format(addr, p))
+                    urls.add('http://{}:{}/'.format(addr, p))
             if p in https_ports:
                 if p == 443:
-                    urls.add('https://{}'.format(addr))
+                    urls.add('https://{}/'.format(addr))
                 else:
-                    urls.add('https://{}:{}'.format(addr, p))
+                    urls.add('https://{}:{}/'.format(addr, p))
     return list(urls)

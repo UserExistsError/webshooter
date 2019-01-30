@@ -3,6 +3,7 @@ import json
 import sqlite3
 import logging
 import threading
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,19 @@ class WebShooterSession():
         conn = self.get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.ERROR,))
         return [r[1] for r in cursor.fetchall()]
+    def normalize_url(self, u):
+        p = urllib.parse.urlparse(u)
+        port = p.port
+        if port is None:
+            if p.scheme.lower() == 'http':
+                port = 80
+            elif p.scheme.lower() == 'https':
+                port = 443
+            else:
+                port = ''
+        n = '{}://{}:{}/{}?{}'.format(p.scheme, p.hostname, port, p.path.strip('/'), p.query)
+        logger.debug('Normalize("{}") -> "{}"'.format(u, n))
+        return n
     def get_results(self, unique=False):
         conn = self.get_conn()
         cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens ORDER BY title, server ASC')
@@ -65,6 +79,6 @@ class WebShooterSession():
             'status': r[5], 'image': r[6]
         } for r in cursor.fetchall()]
         if unique:
-            uniq = {r['url_final']: r for r in results}
+            uniq = {self.normalize_url(r['url_final']): r for r in results}
             results = uniq.values()
         return results

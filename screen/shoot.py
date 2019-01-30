@@ -48,6 +48,7 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
             logger.error('GET {} - {}'.format(url, str(e)))
             resp = e
         except urllib.error.URLError as e:
+            # TODO: check for ssl version error here
             logger.error('GET {} - {}'.format(url, str(e)))
             session.update_url(url, Status.INVALID)
             return

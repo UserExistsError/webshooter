@@ -1,5 +1,5 @@
 # webshooter
-Take screenshots of web sites and generate an HTML report.
+Take screenshots of web sites and generate an HTML report. This tool waits a specified period to allow the page to render before taking the screenshot.
 
 ## Installation
 Requires python3.4+, nodejs, and npm. Puppeteer is used for rendering pages and taking screenshots. Jinja2 is used for html and javascript templating.
