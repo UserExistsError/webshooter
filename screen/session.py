@@ -71,9 +71,12 @@ class WebShooterSession():
         n = '{}://{}:{}/{}?{}'.format(p.scheme, p.hostname, port, p.path.strip('/'), p.query)
         logger.debug('Normalize("{}") -> "{}"'.format(u, n))
         return n
-    def get_results(self, unique=False):
+    def get_results(self, unique=False, ignore_errors=False):
         conn = self.get_conn()
-        cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens ORDER BY title, server ASC')
+        if ignore_errors:
+            cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens WHERE status >= 200 AND status < 400 ORDER BY title, server ASC')
+        else:
+            cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens ORDER BY title, server ASC')
         results = [{
             'url': r[0], 'url_final': r[1], 'title': r[2], 'server': r[3], 'headers': json.loads(r[4]),
             'status': r[5], 'image': r[6]

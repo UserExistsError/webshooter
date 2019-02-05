@@ -29,10 +29,10 @@ def all_sort(x):
 def get_index(r):
     return r['title'].lower() if r['title'] else r['server'].lower()
 
-def from_session(session, template, page_size, unique=False):
+def from_session(session, template, page_size, unique=False, ignore_errors=False):
     ''' {'url': url, 'url_final', url, 'title': page_title, 'server': server_header, 'status': status_code,
     'image': file} '''
-    results = session.get_results(unique)
+    results = session.get_results(unique, ignore_errors)
     if len(results) == 0:
         return None
     logger.info('Generating report: {} screenshot(s)'.format(len(results)))

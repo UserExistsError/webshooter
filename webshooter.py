@@ -70,7 +70,7 @@ def handle_scan(args):
 def handle_report(args):
     template = Template.Tiles if args.tiles else Template.Lines
     session = screen.session.WebShooterSession(args.session)
-    name = report.generate.from_session(session, template, args.page_size, args.unique)
+    name = report.generate.from_session(session, template, args.page_size, args.unique, args.ignore_errors)
     if name:
         print('Report generated: '+name)
     else:
@@ -108,6 +108,8 @@ if __name__ == '__main__':
     # report
     report_parser = subparsers.add_parser('report', help='Generate report')
     report_parser.set_defaults(handle=handle_report)
+    report_parser.add_argument('-i', '--ignore-errors', dest='ignore_errors',action='store_true',
+                               help='ignore non-2XX responses')
     report_parser.add_argument('-t', '--tiles', action='store_true', help='Generate report with tiles')
     report_parser.add_argument('-u', '--unique', action='store_true', help='Ignore duplicate urls from redirects')
     report_parser.add_argument('-p', '--page-size', dest='page_size', default=40, type=int, help='results per page')
