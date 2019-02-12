@@ -3,7 +3,7 @@ import string
 import jinja2
 
 class Template:
-    Lines=os.path.join(os.path.dirname(__file__), 'page_template.html')
+    SingleColumn=os.path.join(os.path.dirname(__file__), 'page_template.html')
     Tiles=os.path.join(os.path.dirname(__file__), 'card_template.html')
     Index=os.path.join(os.path.dirname(__file__), 'index_template.html')
 

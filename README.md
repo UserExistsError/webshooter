@@ -32,8 +32,4 @@ Additional HTTP ports can be added.
 ```
 webshooter.py --session myscreens report
 ```
-The default report generates one screen per row. Use --tiles to get a more dense report. Pagination can be set with the -p option. Navigate pages using the navigation bar or by using the left and right arrow keys. Screenshots are sorted by page title (or Server header if no title). The file index.html is generated with the report that links to the first instance of each unique page title.
-
-For easy viewing, try running with the following options:
-```webshooter.py --session myscreens report --tiles -p 8```
-This will put 8 items per page which should be viewable without scrolling. Then use the left and right arrow keys to navigate between pages.
+The default report generates a tile view which doesn't require vertical scrolling. Use --column to get a less dense report with 1 screenshot per row. Screens per page can be set with the -p option. Navigate pages using the navigation bar or by using the left and right arrow keys. Screenshots are sorted by page title (or Server header if no title). The file index.html is generated with the report that links to the first instance of each unique page title.

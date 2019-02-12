@@ -68,7 +68,7 @@ def handle_scan(args):
     screen.shoot.from_urls(urls, args.threads, args.timeout, args.screen_wait, args.node_path, session, args.mobile, creds)
 
 def handle_report(args):
-    template = Template.Tiles if args.tiles else Template.Lines
+    template = Template.SingleColumn if args.column else Template.Tiles
     session = screen.session.WebShooterSession(args.session)
     name = report.generate.from_session(session, template, args.page_size, args.unique, args.ignore_errors)
     if name:
@@ -110,9 +110,9 @@ if __name__ == '__main__':
     report_parser.set_defaults(handle=handle_report)
     report_parser.add_argument('-i', '--ignore-errors', dest='ignore_errors',action='store_true',
                                help='ignore non-2XX responses')
-    report_parser.add_argument('-t', '--tiles', action='store_true', help='Generate report with tiles')
+    report_parser.add_argument('--column', action='store_true', help='Generate report with single column')
     report_parser.add_argument('-u', '--unique', action='store_true', help='Ignore duplicate urls from redirects')
-    report_parser.add_argument('-p', '--page-size', dest='page_size', default=40, type=int, help='results per page')
+    report_parser.add_argument('-p', '--page-size', dest='page_size', default=8, type=int, help='results per page')
 
     args = parser.parse_args()
 
