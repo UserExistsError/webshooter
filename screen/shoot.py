@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 # puppeteers version of chrome uses this User-Agent
 USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/69.0.3494.0 Safari/537.36'
 USER_AGENT_MOBILE='Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1'
-title_regex = re.compile(b'<title>\s*(.*?)\s*</title>', re.IGNORECASE)
 
 def http_get(url, timeout, user_agent):
     ''' return response body, headers, and status code '''
@@ -39,6 +38,7 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
 
     username, password = None, None
     screen = {'username': None, 'password': None}
+    ssl_version_error = False
 
     for i in range(len(creds)+1):
         req = urllib.request.Request(url, headers=headers)
@@ -48,8 +48,10 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
             logger.error('GET {} - {}'.format(url, str(e)))
             resp = e
         except urllib.error.URLError as e:
-            # TODO: check for ssl version error here
             logger.error('GET {} - {}'.format(url, str(e)))
+            if 'unsupported protocol' in str(e).lower():
+                ssl_version_error = True
+                break
             session.update_url(url, Status.INVALID)
             return
         except Exception as e:
@@ -76,47 +78,43 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
             screen['password'] = password
             break
 
-    title = ''
-    try:
-        page_html = resp.read()
-    except http.client.IncompleteRead as e:
-        page_html = e.partial
-    m = title_regex.search(page_html)
-    if m:
-        title = m.group(1).decode()
-    server = ''
-    for h, v in resp.getheaders():
-        if h.lower() == 'server':
-            server = v
-            break
-    logger.debug('[{}] GET {} : title="{}", server="{}"'.format(resp.getcode(), resp.geturl(), title, server))
+    if ssl_version_error:
+        target_url = url
+    else:
+        target_url = resp.geturl()
 
     # get screenshot
+    page_info_file = ''
     headers = {}
     if screen['username'] is not None:
         headers = auth.basic.get_headers(screen['username'], screen['password'])
-    js_file, img_file = js.script.build(resp.geturl(), timeout * 1000, mobile, headers)
-    logger.info('Taking screenshot: '+resp.geturl())
+    js_file, img_file, inf_file = js.script.build(target_url, timeout * 1000, mobile, headers)
+    logger.info('Taking screenshot: '+target_url)
     js.script.run(js_file, node_path)
     os.unlink(js_file)
+    page_info = json.loads(open(inf_file).read())
+    os.unlink(inf_file)
+
+    #logger.debug('[{}] GET {} : title="{}", server="{}"'.format(page_info['status'], page_info['url_final'], title, server))
+
     if not os.path.exists(img_file):
-        logger.error('Screenshot failed: {}'.format(resp.geturl() or 'error'))
+        logger.error('Screenshot failed: {}'.format(page_info.get('url_final', 'error')))
         session.update_url(url, Status.ERROR)
         return
     if os.path.getsize(img_file) == 0:
-        logger.error('Screenshot failed: '.format(resp.geturl() or 'error'))
+        logger.error('Screenshot failed: {}'.format(page_info.get('url_final', 'error')))
         os.unlink(img_file)
         session.update_url(url, Status.ERROR)
         return
 
     screen.update({
         'url': url,
-        'url_final': resp.geturl(),
-        'title': title,
-        'server': server,
-        'status': resp.getcode(),
+        'url_final': page_info['url_final'],
+        'title': page_info['title'],
+        'server': page_info.get('server', ''),
+        'status': page_info['status'],
         'image': os.path.basename(img_file),
-        'headers': json.dumps(sorted(resp.getheaders(), key=lambda t: t[0].lower()))
+        'headers': json.dumps([(k, page_info['headers'][k]) for k in sorted(page_info['headers'].keys())])
     })
 
     try:

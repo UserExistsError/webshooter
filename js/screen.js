@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const devices = require('puppeteer/DeviceDescriptors');
+const fs = require('fs');
 
 (async () => {
     const browser = await puppeteer.launch({
@@ -21,9 +22,10 @@ const devices = require('puppeteer/DeviceDescriptors');
     }
     var success = false;
     var waitEvents = ['load', 'domcontentloaded', 'networkidle2'];
+    var response = null;
     for (i = 0; i < waitEvents.length; i++) {
         try {
-            await page.goto('{{ url }}', {
+            response = await page.goto('{{ url }}', {
                 waitUntil: waitEvents[i],
                 timeout: {{ timeout }}
             });
@@ -40,7 +42,15 @@ const devices = require('puppeteer/DeviceDescriptors');
 
     if (success) {
 	// give page time to render
-	await sleep({{ screen_wait }});
+        var page_info = {
+            url_final: page.url(),
+            title: await page.title(),
+            headers: response.headers(),
+            status: response.status(),
+            security: response.securityDetails()
+        };
+        fs.writeFileSync('{{ page_info_file }}', JSON.stringify(page_info));
+        await sleep({{ screen_wait }});
         await page.screenshot({
             path: '{{ image }}',
             //fullPage: true

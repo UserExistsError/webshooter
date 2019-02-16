@@ -16,11 +16,13 @@ def build(url, timeout=5000, mobile=False, headers={}, screen_wait_ms=2000):
     os.close(js_h)
     img_h, img_tmp = tempfile.mkstemp(prefix='screen.', suffix='.png', dir='.')
     os.close(img_h)
+    inf_h, inf_tmp = tempfile.mkstemp(prefix='info.', suffix='.json', dir='.')
+    os.close(inf_h)
     script = jinja2.Template(open(JS_TEMPLATE_FILE, 'rb').read().decode())
     rendered = script.render(url=url, image=img_tmp, timeout=timeout, mobile=str(mobile).lower(),
-                             screen_wait=screen_wait_ms, headers=json.dumps(headers))
+                             screen_wait=screen_wait_ms, headers=json.dumps(headers), page_info_file=inf_tmp)
     open(js_tmp, 'wb').write(rendered.encode())
-    return js_tmp, img_tmp
+    return js_tmp, img_tmp, inf_tmp
 
 def run(script_path, node_path='node'):
     cmd = [node_path, script_path]
