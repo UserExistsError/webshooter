@@ -95,26 +95,32 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
     page_info = json.loads(open(inf_file).read())
     os.unlink(inf_file)
 
-    #logger.debug('[{}] GET {} : title="{}", server="{}"'.format(page_info['status'], page_info['url_final'], title, server))
+    title = page_info.get('title', '')
+    server = page_info['headers'].get('server', '')
+    status = page_info.get('status', -1)
+    url_final = page_info.get('url_final', '')
+    headers = [(k, page_info['headers'][k]) for k in page_info['headers']]
+
+    logger.debug('[{}] GET {} : title="{}", server="{}"'.format(status, url_final, title, server))
 
     if not os.path.exists(img_file):
-        logger.error('Screenshot failed: {}'.format(page_info.get('url_final', 'error')))
+        logger.error('Screenshot failed: {}'.format(url_final or 'error'))
         session.update_url(url, Status.ERROR)
         return
     if os.path.getsize(img_file) == 0:
-        logger.error('Screenshot failed: {}'.format(page_info.get('url_final', 'error')))
+        logger.error('Screenshot failed: {}'.format(url_final or 'error'))
         os.unlink(img_file)
         session.update_url(url, Status.ERROR)
         return
 
     screen.update({
         'url': url,
-        'url_final': page_info['url_final'],
-        'title': page_info['title'],
-        'server': page_info.get('server', ''),
-        'status': page_info['status'],
+        'url_final': url_final,
+        'title': title,
+        'server': server,
+        'status': status,
         'image': os.path.basename(img_file),
-        'headers': json.dumps([(k, page_info['headers'][k]) for k in sorted(page_info['headers'].keys())])
+        'headers': json.dumps(list(sorted(headers, key=lambda h: h[0]))) # alphabetic sort on header name
     })
 
     try:

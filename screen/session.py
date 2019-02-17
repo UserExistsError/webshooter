@@ -58,7 +58,7 @@ class WebShooterSession():
         conn = self.get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.ERROR,))
         return [r[1] for r in cursor.fetchall()]
-    def normalize_url(self, u):
+    def normalize_url(self, u, ignore_params=False):
         p = urllib.parse.urlparse(u)
         port = p.port
         if port is None:
@@ -68,10 +68,8 @@ class WebShooterSession():
                 port = 443
             else:
                 port = ''
-        n = '{}://{}:{}/{}?{}'.format(p.scheme, p.hostname, port, p.path.strip('/'), p.query)
-        logger.debug('Normalize("{}") -> "{}"'.format(u, n))
-        return n
-    def get_results(self, unique=False, ignore_errors=False):
+        return '{}://{}:{}/{}?{}'.format(p.scheme, p.hostname, port, p.path.strip('/'), '' if ignore_params else p.query)
+    def get_results(self, ignore_errors=False, unique=True):
         conn = self.get_conn()
         if ignore_errors:
             cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens WHERE status >= 200 AND status < 400 ORDER BY title, server ASC')

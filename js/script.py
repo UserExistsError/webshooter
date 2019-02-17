@@ -26,7 +26,6 @@ def build(url, timeout=5000, mobile=False, headers={}, screen_wait_ms=2000):
 
 def run(script_path, node_path='node'):
     cmd = [node_path, script_path]
-    logger.debug('Running script: {}'.format(' '.join(cmd)))
     try:
         subprocess.check_call(cmd, timeout=60)
     except:
