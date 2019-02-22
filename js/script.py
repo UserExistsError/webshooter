@@ -5,16 +5,29 @@ import jinja2
 import logging
 import tempfile
 import subprocess
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
 # javascript to pass to node and take a screen shot
 JS_TEMPLATE_FILE=os.path.join(os.path.dirname(__file__), 'screen.js')
 
+def filename_from_url(url):
+    u = urllib.parse.urlparse(url)
+    host = u.netloc
+    if ':' in host:
+        host, port = host.split(':')
+    else:
+        if u.scheme.lower() == 'http':
+            port = 80
+        else:
+            port = 443
+    return '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '')
+
 def build(url, timeout=5000, mobile=False, headers={}, screen_wait_ms=2000):
     js_h, js_tmp = tempfile.mkstemp(prefix='script.', suffix='.js', dir='.')
     os.close(js_h)
-    img_h, img_tmp = tempfile.mkstemp(prefix='screen.', suffix='.png', dir='.')
+    img_h, img_tmp = tempfile.mkstemp(prefix=filename_from_url(url)+'.', suffix='.png', dir='.')
     os.close(img_h)
     inf_h, inf_tmp = tempfile.mkstemp(prefix='info.', suffix='.json', dir='.')
     os.close(inf_h)
