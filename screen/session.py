@@ -12,6 +12,7 @@ class Status:
     FINISHED=1
     ERROR=2
     INVALID=3
+    DUPLICATE=4
 
 class WebShooterSession():
     local = threading.local()
@@ -50,6 +51,11 @@ class WebShooterSession():
                           screen['headers'], screen['status'], screen['image'],
                           screen['username'], screen['password']))
             conn.execute('UPDATE urls SET status=1 WHERE url=?', (screen['url'],))
+    def url_screen_exists(self, url_final):
+        conn = self.get_conn()
+        with conn:
+            cur = conn.execute('SELECT url FROM screens WHERE url_final = ? COLLATE NOCASE', (url_final,))
+            return cur.fetchone()
     def get_queued_urls(self):
         conn = self.get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.QUEUED,))

@@ -44,7 +44,7 @@ const fs = require('fs');
 	// give page time to render
         var page_info = {
             url_final: page.url(),
-            title: await page.title(),
+            title: await page.title().catch(function(r) { return '' }),
             headers: response.headers(),
             status: response.status(),
             security: response.securityDetails()

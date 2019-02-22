@@ -78,13 +78,22 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
             screen['password'] = password
             break
 
+    # get final url after following redirects
     if ssl_version_error:
         target_url = url
     else:
         target_url = resp.geturl()
+        if url.lower() != target_url.lower():
+            logger.debug('Redirected: {} -> {}'.format(url, target_url))
+
+    # check if final url was already captured. there is a race condition here with multiple workers
+    # but report generation will catch it.
+    if session.url_screen_exists(target_url):
+        logger.info('Already got a screenshot of {} -> {}'.format(url, target_url))
+        session.update_url(url, Status.DUPLICATE)
+        return
 
     # get screenshot
-    page_info_file = ''
     headers = {}
     if screen['username'] is not None:
         headers = auth.basic.get_headers(screen['username'], screen['password'])
@@ -92,16 +101,10 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
     logger.info('Taking screenshot: '+target_url)
     js.script.run(js_file, node_path)
     os.unlink(js_file)
-    page_info = json.loads(open(inf_file).read())
-    os.unlink(inf_file)
 
-    title = page_info.get('title', '')
-    server = page_info['headers'].get('server', '')
-    status = page_info.get('status', -1)
-    url_final = page_info.get('url_final', '')
-    headers = [(k, page_info['headers'][k]) for k in page_info['headers']]
-
-    logger.debug('[{}] GET {} : title="{}", server="{}"'.format(status, url_final, title, server))
+    if os.path.exists(inf_file):
+        j = open(inf_file).read()
+        os.unlink(inf_file)
 
     if not os.path.exists(img_file):
         logger.error('Screenshot failed: {}'.format(url_final or 'error'))
@@ -112,6 +115,16 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
         os.unlink(img_file)
         session.update_url(url, Status.ERROR)
         return
+
+    page_info = json.loads(j)
+
+    title = page_info.get('title', '')
+    server = page_info['headers'].get('server', '')
+    status = page_info.get('status', -1)
+    url_final = page_info.get('url_final', '')
+    headers = [(k, page_info['headers'][k]) for k in page_info['headers']]
+
+    logger.debug('[{}] GET {} : title="{}", server="{}"'.format(status, url_final, title, server))
 
     screen.update({
         'url': url,
@@ -140,7 +153,7 @@ def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile
     if len(urls) == 0:
         return
     work = []
-    logger.debug('Scanning with {} workers'.format(threads))
+    logger.debug('Scanning with {} worker(s)'.format(threads))
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as e:
         work = [e.submit(shoot_thread_wrapper, u, timeout, screen_wait_ms, node_path, session, mobile, creds) for u in urls]
         logger.debug('Waiting for workers to finish')
