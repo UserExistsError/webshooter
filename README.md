@@ -1,6 +1,8 @@
 # webshooter
 Take screenshots of web sites and generate an HTML report. This tool waits a specified period to allow the page to render before taking the screenshot.
 
+![Report](docs/screenshots/tiles-med.png)
+
 ## Installation
 Requires python3.4+, nodejs, and npm. Puppeteer is used for rendering pages and taking screenshots. Jinja2 is used for html and javascript templating.
 
@@ -18,9 +20,9 @@ webshooter.py --session myscreens scan [-u URL_FILE] [-x NMAP_XML] [URL [... URL
 ```
 This will grab screenshots of all supplied urls. The session file can be used to resume a scan and generate a report. This command can be run multiple times with new urls to add. Once a url is added, it will be remembered in the session file. A screenshot will be attempted once for each url. Failed screenshots can be reattempted with --retry.
 
-You can also provide a file with 1 url per line and pass it in with -u. Positional arguments are also treated as urls. In addition to urls, you can also specify HOST[:PORT] and CIDR ranges.
+You can also provide a file with 1 url per line and pass it in with -u. Positional arguments are also treated as urls. In addition to urls, you can specify HOST[:PORT] and CIDR ranges. If the port is not specified in the url, it is inferred from the scheme. If no scheme or port is given, http/80 and https/443 are both attempted.
 
-An nmap xml file can also be used with -x. Open ports that are considered HTTP (80,8080) or HTTPS (443,8443) will be scanned. You can override these ports with --ports-http and --ports-https. --all-open will treat all open ports as http/s and overrides --ports-http and --ports-https. Note that port specification options only apply to nmap xml. When providing urls as positional arguments or with -u, the port must be specified in the url (or omitted).
+An nmap xml file can also be used with -x. Open ports that are considered HTTP (80,8080) or HTTPS (443,8443) will be scanned. You can override these ports with --ports-http and --ports-https. --all-open will treat all open ports as http/s and overrides --ports-http and --ports-https. Note that --ports-http[s] only applies to nmap xml.
 
 Recommended usage is to provide an nmap xml file generated like so:
 ```
