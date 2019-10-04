@@ -107,11 +107,11 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
         os.unlink(inf_file)
 
     if not os.path.exists(img_file):
-        logger.error('Screenshot failed: {}'.format(url_final or 'error'))
+        logger.error('Screenshot failed: {}'.format(target_url or 'error'))
         session.update_url(url, Status.ERROR)
         return
     if os.path.getsize(img_file) == 0:
-        logger.error('Screenshot failed: {}'.format(url_final or 'error'))
+        logger.error('Screenshot failed: {}'.format(target_url or 'error'))
         os.unlink(img_file)
         session.update_url(url, Status.ERROR)
         return

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import shutil
 import logging
 import netaddr
 import argparse
@@ -33,6 +34,11 @@ def process_url(url):
     return [url]
 
 def handle_scan(args):
+    # verify node exists
+    if shutil.which(args.node_path) is None:
+        print('Failed to find node executable')
+        sys.exit(1)
+
     # get urls to screenshot
     if args.all_open:
         args.ports_http = list(range(2**16))
@@ -93,7 +99,7 @@ if __name__ == '__main__':
     scan_parser.add_argument('-u', '--url-file', dest='url_file', help='urls 1 per line. include scheme')
     scan_parser.add_argument('-n', '--node-path', dest='node_path', default='node', help='nodejs path')
     scan_parser.add_argument('-t', '--timeout', default=5, type=int, help='timeout in seconds')
-    scan_parser.add_argument('-w', '--threads', default=10, type=int, help='worker thread count')
+    scan_parser.add_argument('-w', '--threads', default=5, type=int, help='worker count. each worker runs an instance of chrome headless. default 5')
     scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait', default=2000, type=int, help='wait in millisecs between page load and screenshot')
     scan_parser.add_argument('--mobile', action='store_true', help='Emulate mobile device')
     scan_parser.add_argument('-r', '--retry', action='store_true', help='retry failed urls')
