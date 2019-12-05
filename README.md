@@ -1,5 +1,5 @@
 # webshooter
-Take screenshots of web sites and generate an HTML report. This tool waits a specified period to allow the page to render before taking the screenshot.
+Take screenshots of web sites and generate an HTML report. This tool waits a specified period to allow the page to render before taking the screenshot. Report sorts screenshots by page title and server header.
 
 ![Report](docs/screenshots/tiles-med.png)
 
