@@ -3,73 +3,29 @@
 {% block body %}
 <body onload="centerNav();">
 
+  {% include "image_modal.html" %}
+
   <div class="album text-muted">
     <div class="container-fluid">
 
-      <!-- Build page index -->
-      <nav aria-label="Page Index">
-        <ul class="pagination pagination-sm">
-
-          <!-- Previous button -->
-          {% if pageno == 0 %}
-          <li class="page-item disabled">
-            <a class="page-link" id="prev-page">Prev</a>
-            {% else %}
-          <li class="page-item">
-            <a class="page-link" id="prev-page" href="{{ page_prev }}">Prev</a>
-            {% endif %}
-          </li>
-
-          <!-- First page button -->
-          {% if pageno == 0 %}
-          <li class="page-item disabled">
-            {% else %}
-          <li class="page-item">
-            {% endif %}
-            <a class="page-link" id="first-page" href="{{ pages[0] }}">First</a>
-          </li>
-
-          <ul class="pagination" id="nav-top" style="overflow-x: scroll;">
-            {% for p in pages_index %}
-            {% if pageno == p['number'] %}
-            <li class="page-item active" style="margin: auto;"><a class="page-link page-li" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
-            {% else %}
-            <li class="page-item"><a class="page-link page-li" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
-            {% endif %}
-            {% endfor %}
-          </ul>
-
-          <!-- Last page button -->
-          {% if pageno == pages|length - 1 %}
-          <li class="page-item disabled">
-            {% else %}
-          <li class="page-item">
-            {% endif %}
-            <a class="page-link" id="last-page" href="{{ pages[-1] }}">Last</a>
-          </li>
-
-          <!-- Next page button -->
-          {% if pageno == pages|length - 1 %}
-          <li class="page-item disabled">
-            <a class="page-link" id="next-page">Next</a>
-            {% else %}
-          <li class="page-item">
-            <a class="page-link" id="next-page" href="{{ page_next }}">Next</a>
-            {% endif %}
-          </li>
-
-        </ul>
-      </nav>
+      {% include "pagination.html" %}
 
       <!-- add screen shots, 1 per row -->
       {% for s in screens %}
+      {% set row_number = loop.index %}
       <div class="container-fluid py-0">
         <div class="row p-1" id="{{ s.id }}">
           <div class="col-md-3 p-1 bg-secondary">
-            <a href="{{ s.image }}" target="_blank" rel="noopener noreferrer">
+
+            <a data-toggle="modal" data-target="#img-modal" id="img-modal-btn-{{ row_number }}" href="{{ s.image }}" target="_blank" rel="noopener noreferrer">
               <img src="{{ s.image }}" class="w-100 border-0 bg-light"/>
             </a>
           </div>
+
+          <script>
+            var btn = $('#img-modal-btn-{{ row_number }}');
+            btn.on('click', {title: "{{ s.title }}", image: "{{ s.image }}"}, showModal);
+          </script>
 
           <div class="col-md-8 p-1 ml-1 bg-secondary">
             <div class="bg-light h-100 p-2">
@@ -83,7 +39,6 @@
                   <tr><td>
                       <button class="collapsible btn btn-primary" onclick="toggleHeaders('headers-row-{{ loop.index }}')">Headers</button>
                   </td></tr>
-                  {% set row_number = loop.index %}
                   {% for h, v in s.headers %}
                   <tr><td class="http-headers headers-row-{{ row_number }}"><b>{{ h }}</b>: {{ v }}</td></tr>
                   {% endfor %}
