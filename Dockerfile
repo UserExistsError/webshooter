@@ -1,18 +1,18 @@
-FROM alpine:3.10
+FROM python:3.7-alpine3.12
 
 RUN apk add --no-cache \
-    python3 \
     nodejs \
     npm \
     chromium
 
-COPY requirements.txt /tmp/
+WORKDIR /web
+COPY requirements.txt ./
 RUN npm install puppeteer && \
-    pip3 install -r /tmp/requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 RUN adduser -h /web -D -u 99999 web
-WORKDIR /web
-ADD --chown=web:web . /web/
+ADD --chown=web:web . ./
+USER web
 
 # replace chrome path with system version
 RUN sed -i "s#args: \[#args: \['--disable-gpu', '--headless', #" js/screen.js && \
@@ -22,5 +22,4 @@ RUN sed -i "s#args: \[#args: \['--disable-gpu', '--headless', #" js/screen.js &&
 # docker run -p 127.0.0.1:8000:8000/tcp -it IMAGE
 EXPOSE 8000
 
-USER web
 ENTRYPOINT [ "/bin/sh" ]

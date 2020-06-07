@@ -11,7 +11,7 @@ env = Environment(
 class Template:
     SingleColumn = 'page.html'
     Tiles = 'card.html'
-    Index='index.html'
+    Index = 'index.html'
 
 def populate(template, title, screens, count, pages_index, pageno, page_prev, page_next, pages):
     t = env.get_template(template)

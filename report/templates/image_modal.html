@@ -1,0 +1,30 @@
+<div class="modal container" tabindex="-1" id="img-modal" role="dialog" aria-hidden="true" aria-labelled-by="img-modal-title">
+  <div class="model-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="img-modal-title"></h4>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <!-- dismiss modal when you click inside the body -->
+      <a data-dismiss="modal">
+        <div class="modal-body">
+          <img id="img-modal-src" src=""/>
+        </div>
+      </a>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showModal (e) {
+      e.preventDefault();
+      $('#img-modal-title').text(e.data.title);
+      $('#img-modal-src').attr('src', e.data.image);
+      $('#img-modal').show();
+  };
+</script>

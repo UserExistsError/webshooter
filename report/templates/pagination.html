@@ -1,0 +1,54 @@
+<!-- Build page index -->
+<nav aria-label="Page Index">
+  <ul class="pagination pagination-sm">
+
+    <!-- Previous button -->
+    {% if pageno == 0 %}
+    <li class="page-item disabled">
+      <a class="page-link" id="prev-page">Prev</a>
+      {% else %}
+    <li class="page-item">
+      <a class="page-link" id="prev-page" href="{{ page_prev }}">Prev</a>
+      {% endif %}
+    </li>
+
+    <!-- First page button -->
+    {% if pageno == 0 %}
+    <li class="page-item disabled">
+      {% else %}
+    <li class="page-item">
+      {% endif %}
+      <a class="page-link" id="first-page" href="{{ pages[0] }}">First</a>
+    </li>
+
+    <ul class="pagination pagination-sm" id="nav-top" style="overflow-x: scroll;">
+      {% for p in pages_index %}
+      {% if pageno == p['number'] %}
+      <li class="page-item active" style="margin: auto;"><a class="page-link page-li" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
+      {% else %}
+      <li class="page-item"><a class="page-link page-li" href="{{ p['href'] }}">{{ p['number'] }}</a></li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+
+    <!-- Last page button -->
+    {% if pageno == pages|length - 1 %}
+    <li class="page-item disabled">
+      {% else %}
+    <li class="page-item">
+      {% endif %}
+      <a class="page-link" id="last-page" href="{{ pages[-1] }}">Last</a>
+    </li>
+
+    <!-- Next page button -->
+    {% if pageno == pages|length - 1 %}
+    <li class="page-item disabled">
+      <a class="page-link" id="next-page">Next</a>
+      {% else %}
+    <li class="page-item">
+      <a class="page-link" id="next-page" href="{{ page_next }}">Next</a>
+      {% endif %}
+    </li>
+
+  </ul>
+</nav>
