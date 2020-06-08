@@ -1,0 +1,17 @@
+{% extends "main.html" %}
+
+{% block body %}
+<body>
+
+  <nav aria-label="Title Index">
+    <ul class="nav flex-column">
+      {% for i in index %}
+      <li class="nav-item">
+        <a class="nav-link" id="prev-page" href="{{ i[1] }}">Page {{ i[2] }}: {{ i[0] }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+</body>
+{% endblock %}
