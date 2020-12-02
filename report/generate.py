@@ -1,4 +1,5 @@
 import os
+import base64
 import shutil
 import logging
 from collections import deque
@@ -29,7 +30,7 @@ def all_sort(x):
 def get_index(r):
     return r['title'].lower() if r['title'] else r['server'].lower()
 
-def from_session(session, template, page_size, ignore_errors=False):
+def from_session(session, template, page_size, ignore_errors=False, embed_images=False):
     ''' {'url': url, 'url_final', url, 'title': page_title, 'server': server_header, 'status': status_code,
     'image': file} '''
     results = session.get_results(ignore_errors)
@@ -55,6 +56,8 @@ def from_session(session, template, page_size, ignore_errors=False):
         screens = results[i:i+page_size]
         for j, s in enumerate(screens):
             s['id'] = 'result-id-{}'.format(pageno * page_size + j)
+            if embed_images:
+                s['image'] = 'data:image/png;base64,'+base64.b64encode(open(s['image'], 'rb').read()).decode()
         pages_index = deque([{'href': p, 'number':i} for i, p in enumerate(pages)])
         # center active page
         pages_index.rotate(len(pages)//2 - pageno)

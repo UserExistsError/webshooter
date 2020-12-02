@@ -77,7 +77,7 @@ def handle_scan(args):
 def handle_report(args):
     template = Template.SingleColumn if args.column else Template.Tiles
     session = screen.session.WebShooterSession(args.session)
-    name = report.generate.from_session(session, template, args.page_size, args.ignore_errors)
+    name = report.generate.from_session(session, template, args.page_size, args.ignore_errors, args.embed_images)
     if name:
         print('Report generated: '+name)
     else:
@@ -119,6 +119,7 @@ if __name__ == '__main__':
                                help='ignore non-2XX responses')
     report_parser.add_argument('--column', action='store_true', help='Generate report with single column')
     report_parser.add_argument('-p', '--page-size', dest='page_size', default=8, type=int, help='results per page')
+    report_parser.add_argument('--embed-images', dest='embed_images', action='store_true', help='Embed images in HTML as base64')
 
     args = parser.parse_args()
 
