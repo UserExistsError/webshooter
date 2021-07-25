@@ -1,20 +1,48 @@
 # webshooter
+
 Take screenshots of web sites and generate an HTML report. This tool waits a specified period to allow the page to render before taking the screenshot. Report sorts screenshots by page title and server header.
 
 ![Report](docs/screenshots/tiles-med.png)
 
 ## Installation
+
+### Manual Install
+
 Requires python3.4+, nodejs, and npm. Puppeteer is used for rendering pages and taking screenshots. Jinja2 is used for html and javascript templating.
 
 Get node from here https://nodejs.org/ and extract it. Add the bin directory (contains node and npm) to your PATH.
 
 Install remaining requirements:
+
 ```
- npm install puppeteer
- pip3 install -r requirements.txt
+npm install
+pip3 install -r requirements.txt
 ```
 
+### Docker
+
+Instead of manually installing dependencies, you can just build from the included Dockerfile with:
+
+```
+docker build -t webshooter .
+```
+
+Then run with:
+
+```
+docker run -it -p 127.0.0.1:8000:8000/tcp webshooter
+```
+
+After generating a report, you can access it outside the container with:
+
+```
+python -m http.server 8000
+```
+
+Browse to http://localhost:8000/page.0.html from your host to access the report.
+
 ## Usage
+
 ```
 webshooter.py --session myscreens scan [-u URL_FILE] [-x NMAP_XML] [URL [... URL]]
 ```
@@ -31,6 +59,7 @@ nmap -p 80,443,8000,8080,8443,8888 -oX http.xml ...
 Additional HTTP ports can be added.
 
 ## Report
+
 ```
 webshooter.py --session myscreens report
 ```

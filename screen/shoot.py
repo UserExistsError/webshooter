@@ -1,12 +1,14 @@
 import os
-import re
 import ssl
 import json
+import time
 import logging
-import http.client
+import tempfile
+import subprocess
 import urllib.error
 import urllib.request
 import concurrent.futures
+from binascii import hexlify
 
 import auth.basic
 import js.script
@@ -18,16 +20,27 @@ logger = logging.getLogger(__name__)
 USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/69.0.3494.0 Safari/537.36'
 USER_AGENT_MOBILE='Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1'
 
-def http_get(url, timeout, user_agent):
-    ''' return response body, headers, and status code '''
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    logger.debug('GET '+url)
-    req = urllib.request.Request(url, headers={'User-Agent': user_agent})
-    return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+CAPTURE_TOKEN=hexlify(os.urandom(16)).decode('ascii')
+CAPTURE_PORT=3000
+CAPTURE_URL='http://127.0.0.1:{}'.format(CAPTURE_PORT)
 
-def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds):
+def image_file_from_url(url):
+    u = urllib.parse.urlparse(url)
+    host = u.netloc
+    if ':' in host:
+        host, port = host.split(':')
+    else:
+        if u.scheme.lower() == 'http':
+            port = 80
+        else:
+            port = 443
+    prefix = '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '') + '.'
+    img_h, img_tmp = tempfile.mkstemp(prefix=prefix, suffix='.png', dir='.')
+    os.close(img_h)
+    return img_tmp
+
+
+def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds, token=CAPTURE_TOKEN):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -97,14 +110,27 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
     headers = {}
     if screen['username'] is not None:
         headers = auth.basic.get_headers(screen['username'], screen['password'])
-    js_file, img_file, inf_file = js.script.build(target_url, timeout * 1000, mobile, headers)
-    logger.info('Taking screenshot: '+target_url)
-    js.script.run(js_file, node_path)
-    os.unlink(js_file)
 
-    if os.path.exists(inf_file):
-        j = open(inf_file).read()
-        os.unlink(inf_file)
+    img_file = image_file_from_url(url)
+    capture = {
+        'url': target_url,
+        'timeout': timeout*1000,
+        'mobile': mobile,
+        'headers': headers,
+        'render_wait': 2000,
+        'image_path': img_file
+    }
+    logger.info('Taking screenshot: '+target_url)
+    req = urllib.request.Request(CAPTURE_URL + '/capture',
+        data=json.dumps(capture).encode(),
+        headers={'token': token, 'content-type': 'application/json'})
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        page_info = json.load(resp)
+        logger.debug(page_info)
+    except Exception as e:
+        logger.error('Failed to request screenshot: '+str(e))
+        return
 
     if not os.path.exists(img_file):
         logger.error('Screenshot failed: {}'.format(target_url or 'error'))
@@ -115,8 +141,6 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
         os.unlink(img_file)
         session.update_url(url, Status.ERROR)
         return
-
-    page_info = json.loads(j)
 
     title = page_info.get('title', '')
     server = page_info['headers'].get('server', '')
@@ -152,6 +176,28 @@ def shoot_thread_wrapper(url, timeout, screen_wait_ms, node_path, session, mobil
 def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile, creds=None):
     if len(urls) == 0:
         return
+    threads = min(threads, len(urls))
+
+    # start node server for taking capture requests
+    logger.debug('Starting capture service with parameters: token={}, port={}'.format(CAPTURE_TOKEN, CAPTURE_PORT))
+    js_file = js.script.build(CAPTURE_TOKEN, CAPTURE_PORT)
+    proc = js.script.run_background(js_file, node_path)
+    logger.info('Warming up the headless browser...')
+    for i in range(30):
+        req = urllib.request.Request(CAPTURE_URL + '/status', headers={'token': CAPTURE_TOKEN}, method='POST')
+        try:
+            resp = urllib.request.urlopen(req, timeout=1)
+            j = json.load(resp)
+            threads = min(threads, j['poolSize'])
+            global USER_AGENT
+            USER_AGENT = j['userAgent'].replace('HeadlessChrome', 'Chrome')
+            logger.debug('Updated User-Agent: '+USER_AGENT)
+            break
+        except Exception as e:
+            if 'connection refused' not in str(e).lower():
+                logger.error('Failed to check status of capture service: '+str(e))
+            time.sleep(1)
+
     work = []
     logger.debug('Scanning with {} worker(s)'.format(threads))
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as e:
@@ -164,3 +210,17 @@ def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile
             print('Aborting! Cancelling workers...')
             for w in work:
                 w.cancel()
+
+    # cleanup
+    os.unlink(js_file)
+    req = urllib.request.Request(CAPTURE_URL + '/shutdown', headers={'token': CAPTURE_TOKEN}, method='POST')
+    try:
+        logger.debug('Shutting down capture service: ' + CAPTURE_URL + '/shutdown')
+        resp = urllib.request.urlopen(req, timeout=timeout)
+    except:
+        logger.error('Failed to gracefully shutdown capture service')
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        logger.debug('Forcibly terminating the capture service')
+        proc.terminate()

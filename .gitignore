@@ -93,3 +93,4 @@ ENV/
 script.*.js
 page.*.html
 index.html
+tmp/
