@@ -1,7 +1,6 @@
 const puppeteer = require('puppeteer');
 const devices = puppeteer.devices;
 const fs = require('fs');
-const poolSize = 1;
 
 const express = require('express');
 const app = express();
@@ -9,6 +8,7 @@ const crypto = require('crypto');
 const port = {{ port }};
 const csrfToken = Buffer.from('{{ token }}');
 
+const viewPortDims = {width: 1600, height: 900};
 
 // Add CSRF middleware
 app.use((req, res, next) => {
@@ -32,10 +32,9 @@ app.use(express.json());
 Capture Request
 {
     url: <string>,
-    image_path: <string>,
-    timeout: <int>,
+    timeout_ms: <int>,
     mobile: <bool>,
-    render_wait: <int>,
+    render_wait_ms: <int>,
     headers: <array>
 }
 */
@@ -64,8 +63,10 @@ app.post('/shutdown', async (req, res) => {
 app.post('/status', async (req, res) => {
     let browser = await getBrowser();
     res.json({
-        'userAgent': await browser.userAgent(),
-        'poolSize': poolSize
+        userAgent: await browser.userAgent(),
+        userAgentMobile: devices['iPhone X']['userAgent'],
+        viewPort: viewPortDims,
+        viewPortMobile: devices['iPhone X']['viewport']
     });
 });
 
@@ -80,15 +81,26 @@ async function getBrowser() {
             args: ['--no-sandbox'],
             ignoreHTTPSErrors: true,
             headless: true,
-            defaultViewport: {width: 1600, height: 900, isMobile: false}
+            defaultViewport: {
+                width: viewPortDims.width,
+                height: viewPortDims.height
+            }
         });
     }
     return g_browser;
 }
 
+
+function sleep(millisec) {
+    return new Promise(resolve => setTimeout(resolve, millisec));
+}
+
 async function capture(opts) {
-    let browser = await getBrowser();
-    const page = await browser.newPage();
+    const browser = await getBrowser();
+
+    //const page = await browser.newPage();
+    const context = await browser.createIncognitoBrowserContext();
+    const page = await context.newPage();
 
     // dismiss dialogs. these can hang the screenshot
     page.on('dialog', async dialog => {
@@ -97,16 +109,17 @@ async function capture(opts) {
 
     page.setExtraHTTPHeaders(opts.headers);
     if (opts.mobile) {
-        page.emulate(devices['iPhone 6']);
+        // see https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts
+        page.emulate(devices['iPhone X']);
     }
     var success = false;
-    var waitEvents = ['load', 'domcontentloaded', 'networkidle2'];
+    const waitEvents = ['load', 'domcontentloaded', 'networkidle2'];
     var response = null;
     for (i = 0; i < waitEvents.length; i++) {
         try {
             response = await page.goto(opts.url, {
                 waitUntil: waitEvents[i],
-                timeout: opts.timeout
+                timeout: opts.timeout_ms
             });
             success = true;
             break;
@@ -115,36 +128,32 @@ async function capture(opts) {
         }
     }
 
-    function sleep(millisec) {
-        return new Promise(resolve => setTimeout(resolve, millisec));
-    }
-
     var page_info = {};
     if (success) {
-	// give page time to render
+        // give page time to render
         page_info = {
             url_final: page.url(),
             title: await page.title().catch(function(r) { return '' }),
             headers: response.headers(),
             status: response.status(),
             security: response.securityDetails(),
-            image_path: opts.image_path
+            image: ''
         };
-        await sleep(opts.screen_wait);
-        await page.screenshot({
-            //encoding: 'base64',
-            path: opts.image_path,
+        await sleep(opts.render_wait_ms);
+        page_info.image = await page.screenshot({
+            encoding: 'base64',
+            //path: opts.image_path,
             //fullPage: true
             clip: {
                 x: 0,
                 y: 0,
-                width: 1600,
-                height: 900
+                width: page.viewport().width,
+                height: page.viewport().height
             }
         });
     } else {
         console.log('Failed to get screenshot');
     }
-    //await browser.close();
+    await page.close();
     return page_info;
 }

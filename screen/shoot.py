@@ -2,6 +2,8 @@ import os
 import ssl
 import json
 import time
+import math
+import base64
 import logging
 import tempfile
 import subprocess
@@ -16,15 +18,71 @@ from screen.session import Status
 
 logger = logging.getLogger(__name__)
 
-# puppeteers version of chrome uses this User-Agent
-USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/69.0.3494.0 Safari/537.36'
-USER_AGENT_MOBILE='Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1'
+class CaptureService():
+    DEFAULT_RENDER_WAIT_MS = 3000
+    DEFAULT_TIMEOUT = 5
+    def __init__(self, node_path, mobile=False, timeout=DEFAULT_TIMEOUT, render_wait_ms=DEFAULT_RENDER_WAIT_MS):
+        self.host = '127.0.0.1'
+        self.port = 3000
+        self.scheme = 'http'
+        self.token = hexlify(os.urandom(16)).decode('ascii')
+        # how long headless browser should wait for page load
+        self.page_load_timeout_ms = timeout * 1000
+        # how long to wait for capture service to respond. should always be greater than combined page load and render wait times
+        self.service_timeout = math.ceil( (self.page_load_timeout_ms + render_wait_ms) / 1000 )
+        self.node_path = node_path
+        self.render_wait_ms = render_wait_ms
+        self.mobile = mobile
+        self.user_agent = ''
+        self.proc = None
+        self.script = None
+    def start(self):
+        self.script = js.script.build(self.token, self.port)
+        self.proc = js.script.run_background(self.script, self.node_path)
+        logger.info('Warming up the headless browser...')
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            try:
+                res = self.status()
+                self.user_agent = res['userAgentMobile'] if self.mobile else res['userAgent'].replace('HeadlessChrome', 'Chrome')
+                logger.debug('Updated User-Agent: '+self.user_agent)
+                return True
+            except Exception as e:
+                if 'connection refused' not in str(e).lower():
+                    logger.error('Failed to check status of capture service: '+str(e))
+                time.sleep(1)
+        return False
+    def base_url(self):
+        return '{}://{}:{}'.format(self.scheme, self.host, self.port)
+    def headers(self):
+        return {'token': self.token, 'content-type': 'application/json'}
+    def capture(self, url, headers):
+        body = {
+            'url': url,
+            'mobile': self.mobile,
+            'render_wait_ms': self.render_wait_ms,
+            'headers': headers,
+            'timeout_ms': self.page_load_timeout_ms
+        }
+        req = urllib.request.Request(self.base_url() + '/capture', data=json.dumps(body).encode(), headers=self.headers(), method='POST')
+        return json.load(urllib.request.urlopen(req, timeout=self.service_timeout))
+    def shutdown(self):
+        try:
+            req = urllib.request.Request(self.base_url() + '/shutdown', headers=self.headers(), method='POST')
+            resp = urllib.request.urlopen(req, timeout=self.service_timeout)
+        except:
+            logger.error('Failed to gracefully terminate capture service')
+        try:
+            self.proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            logger.debug('Forcibly terminating the capture service')
+            self.proc.terminate()
+        os.unlink(self.script)
+    def status(self):
+        req = urllib.request.Request(self.base_url() + '/status', headers=self.headers(), method='POST')
+        return json.load(urllib.request.urlopen(req, timeout=self.service_timeout))
 
-CAPTURE_TOKEN=hexlify(os.urandom(16)).decode('ascii')
-CAPTURE_PORT=3000
-CAPTURE_URL='http://127.0.0.1:{}'.format(CAPTURE_PORT)
-
-def image_file_from_url(url):
+def image_name_from_url(url):
     u = urllib.parse.urlparse(url)
     host = u.netloc
     if ':' in host:
@@ -34,18 +92,14 @@ def image_file_from_url(url):
             port = 80
         else:
             port = 443
-    prefix = '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '') + '.'
-    img_h, img_tmp = tempfile.mkstemp(prefix=prefix, suffix='.png', dir='.')
-    os.close(img_h)
-    return img_tmp
+    return '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '')
 
 
-def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds, token=CAPTURE_TOKEN):
+def shoot_thread(url, capcli, session, creds):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    user_agent = USER_AGENT_MOBILE if mobile else USER_AGENT
-    headers = {'User-Agent': user_agent}
+    headers = {'User-Agent': capcli.user_agent}
     if not creds:
         creds = [(None, None)]
 
@@ -56,7 +110,7 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
     for i in range(len(creds)+1):
         req = urllib.request.Request(url, headers=headers)
         try:
-            resp = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+            resp = urllib.request.urlopen(req, timeout=capcli.service_timeout, context=ctx)
         except urllib.error.HTTPError as e:
             logger.error('GET {} - {}'.format(url, str(e)))
             resp = e
@@ -111,34 +165,23 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
     if screen['username'] is not None:
         headers = auth.basic.get_headers(screen['username'], screen['password'])
 
-    img_file = image_file_from_url(url)
-    capture = {
-        'url': target_url,
-        'timeout': timeout*1000,
-        'mobile': mobile,
-        'headers': headers,
-        'render_wait': 2000,
-        'image_path': img_file
-    }
     logger.info('Taking screenshot: '+target_url)
-    req = urllib.request.Request(CAPTURE_URL + '/capture',
-        data=json.dumps(capture).encode(),
-        headers={'token': token, 'content-type': 'application/json'})
     try:
-        resp = urllib.request.urlopen(req, timeout=timeout)
-        page_info = json.load(resp)
-        logger.debug(page_info)
+        page_info = capcli.capture(target_url, headers)
+        if len(page_info['image']) == 0:
+            raise ValueError('got zero-length image')
+        #logger.debug(page_info)
     except Exception as e:
         logger.error('Failed to request screenshot: '+str(e))
-        return
-
-    if not os.path.exists(img_file):
-        logger.error('Screenshot failed: {}'.format(target_url or 'error'))
         session.update_url(url, Status.ERROR)
         return
-    if os.path.getsize(img_file) == 0:
-        logger.error('Screenshot failed: {}'.format(target_url or 'error'))
-        os.unlink(img_file)
+
+    try:
+        with tempfile.NamedTemporaryFile(prefix=image_name_from_url(url)+'.', suffix='.png', dir='.', delete=False) as fp:
+            img_file = fp.name
+            fp.write(base64.b64decode(page_info['image']))
+    except Exception as e:
+        logger.error('Failed to save screenshot: '+str(e))
         session.update_url(url, Status.ERROR)
         return
 
@@ -166,9 +209,9 @@ def shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds
         logger.error('Failed to add screenshot: '+str(e))
 
 
-def shoot_thread_wrapper(url, timeout, screen_wait_ms, node_path, session, mobile, creds):
+def shoot_thread_wrapper(url, capcli, session, creds):
     try:
-        shoot_thread(url, timeout, screen_wait_ms, node_path, session, mobile, creds)
+        shoot_thread(url, capcli, session, creds)
     except Exception as e:
         logger.error('Failed on {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
@@ -179,29 +222,15 @@ def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile
     threads = min(threads, len(urls))
 
     # start node server for taking capture requests
-    logger.debug('Starting capture service with parameters: token={}, port={}'.format(CAPTURE_TOKEN, CAPTURE_PORT))
-    js_file = js.script.build(CAPTURE_TOKEN, CAPTURE_PORT)
-    proc = js.script.run_background(js_file, node_path)
-    logger.info('Warming up the headless browser...')
-    for i in range(30):
-        req = urllib.request.Request(CAPTURE_URL + '/status', headers={'token': CAPTURE_TOKEN}, method='POST')
-        try:
-            resp = urllib.request.urlopen(req, timeout=1)
-            j = json.load(resp)
-            threads = min(threads, j['poolSize'])
-            global USER_AGENT
-            USER_AGENT = j['userAgent'].replace('HeadlessChrome', 'Chrome')
-            logger.debug('Updated User-Agent: '+USER_AGENT)
-            break
-        except Exception as e:
-            if 'connection refused' not in str(e).lower():
-                logger.error('Failed to check status of capture service: '+str(e))
-            time.sleep(1)
+    capcli = CaptureService(node_path, mobile=mobile, timeout=timeout, render_wait_ms=screen_wait_ms)
+    if not capcli.start():
+        logger.error('Failed to start capture service')
+        return
 
     work = []
     logger.debug('Scanning with {} worker(s)'.format(threads))
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as e:
-        work = [e.submit(shoot_thread_wrapper, u, timeout, screen_wait_ms, node_path, session, mobile, creds) for u in urls]
+        work = [e.submit(shoot_thread_wrapper, u, capcli, session, creds) for u in urls]
         logger.debug('Waiting for workers to finish')
         try:
             while len(work):
@@ -211,16 +240,4 @@ def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile
             for w in work:
                 w.cancel()
 
-    # cleanup
-    os.unlink(js_file)
-    req = urllib.request.Request(CAPTURE_URL + '/shutdown', headers={'token': CAPTURE_TOKEN}, method='POST')
-    try:
-        logger.debug('Shutting down capture service: ' + CAPTURE_URL + '/shutdown')
-        resp = urllib.request.urlopen(req, timeout=timeout)
-    except:
-        logger.error('Failed to gracefully shutdown capture service')
-    try:
-        proc.wait(timeout=3)
-    except subprocess.TimeoutExpired:
-        logger.debug('Forcibly terminating the capture service')
-        proc.terminate()
+    capcli.shutdown()

@@ -100,7 +100,7 @@ if __name__ == '__main__':
     scan_parser.add_argument('-u', '--url-file', dest='url_file', help='urls 1 per line. include scheme')
     scan_parser.add_argument('-n', '--node-path', dest='node_path', default='node', help='nodejs path')
     scan_parser.add_argument('-t', '--timeout', default=5, type=int, help='timeout in seconds')
-    scan_parser.add_argument('-w', '--threads', default=5, type=int, help='worker count. each worker runs an instance of chrome headless. default 5')
+    scan_parser.add_argument('-w', '--threads', default=5, type=int, help='number of concurrent screenshots to take. default 5')
     scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait', default=2000, type=int, help='wait in millisecs between page load and screenshot')
     scan_parser.add_argument('--mobile', action='store_true', help='Emulate mobile device')
     scan_parser.add_argument('-r', '--retry', action='store_true', help='retry failed urls')
