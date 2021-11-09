@@ -18,6 +18,10 @@ from screen.session import Status
 
 logger = logging.getLogger(__name__)
 
+class CaptureError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
 class CaptureService():
     DEFAULT_RENDER_WAIT_MS = 3000
     DEFAULT_TIMEOUT = 5
@@ -65,7 +69,17 @@ class CaptureService():
             'timeout_ms': self.page_load_timeout_ms
         }
         req = urllib.request.Request(self.base_url() + '/capture', data=json.dumps(body).encode(), headers=self.headers(), method='POST')
-        return json.load(urllib.request.urlopen(req, timeout=self.service_timeout))
+        err = None
+        try:
+            with urllib.request.urlopen(req, timeout=self.service_timeout) as resp:
+                if 200 <= resp.status < 300:
+                    return json.load(resp)
+                err = json.load(resp)['error']
+        except urllib.error.HTTPError as e:
+            err = json.load(e)['error']
+        except Exception as e:
+            err = str(e)
+        raise CaptureError(err)
     def shutdown(self):
         try:
             req = urllib.request.Request(self.base_url() + '/shutdown', headers=self.headers(), method='POST')
@@ -100,8 +114,8 @@ def shoot_thread(url, capcli, session, creds):
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     headers = {'User-Agent': capcli.user_agent}
-    if not creds:
-        creds = [(None, None)]
+    if creds is None:
+        creds = []
 
     username, password = None, None
     screen = {'username': None, 'password': None}
@@ -171,8 +185,8 @@ def shoot_thread(url, capcli, session, creds):
         if len(page_info['image']) == 0:
             raise ValueError('got zero-length image')
         #logger.debug(page_info)
-    except Exception as e:
-        logger.error('Failed to request screenshot: '+str(e))
+    except CaptureError as e:
+        logger.error('Failed to take screenshot for {}: {}'.format(target_url, str(e)))
         session.update_url(url, Status.ERROR)
         return
 

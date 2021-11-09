@@ -40,13 +40,15 @@ Capture Request
 */
 app.post('/capture', async (req, res) => {
     //console.log(req.body);
+    const browser = await getBrowser();
+    const context = await browser.createIncognitoBrowserContext();
     try {
-        let page_info = await capture(req.body);
+        let page_info = await capture(context, req.body);
         res.json(page_info);
     } catch (err) {
-        console.log(err);
-        res.status(500).send(err);
+        res.status(500).json({'error': err});
     }
+    await context.close();
 });
 
 app.post('/shutdown', async (req, res) => {
@@ -95,11 +97,7 @@ function sleep(millisec) {
     return new Promise(resolve => setTimeout(resolve, millisec));
 }
 
-async function capture(opts) {
-    const browser = await getBrowser();
-
-    //const page = await browser.newPage();
-    const context = await browser.createIncognitoBrowserContext();
+async function capture(context, opts) {
     const page = await context.newPage();
 
     // dismiss dialogs. these can hang the screenshot
@@ -128,32 +126,30 @@ async function capture(opts) {
         }
     }
 
-    var page_info = {};
-    if (success) {
-        // give page time to render
-        page_info = {
-            url_final: page.url(),
-            title: await page.title().catch(function(r) { return '' }),
-            headers: response.headers(),
-            status: response.status(),
-            security: response.securityDetails(),
-            image: ''
-        };
-        await sleep(opts.render_wait_ms);
-        page_info.image = await page.screenshot({
-            encoding: 'base64',
-            //path: opts.image_path,
-            //fullPage: true
-            clip: {
-                x: 0,
-                y: 0,
-                width: page.viewport().width,
-                height: page.viewport().height
-            }
-        });
-    } else {
-        console.log('Failed to get screenshot');
+    if (!success) {
+        throw 'failed to navigate to URL';
     }
-    await page.close();
+
+    // give page time to render
+    let page_info = {
+        url_final: page.url(),
+        title: await page.title().catch(function(r) { return '' }),
+        headers: response.headers(),
+        status: response.status(),
+        security: response.securityDetails(),
+        image: ''
+    };
+    await sleep(opts.render_wait_ms);
+    page_info.image = await page.screenshot({
+        encoding: 'base64',
+        //path: opts.image_path,
+        //fullPage: true
+        clip: {
+            x: 0,
+            y: 0,
+            width: page.viewport().width,
+            height: page.viewport().height
+        }
+    });
     return page_info;
 }

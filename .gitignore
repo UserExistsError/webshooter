@@ -88,6 +88,10 @@ ENV/
 # Rope project settings
 .ropeproject
 
+# node
+node_modules/
+package-lock.json
+
 *.png
 *.bak
 script.*.js
