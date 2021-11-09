@@ -14,8 +14,8 @@ from report.template import Template
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_HTTP_PORTS = [80, 8080]
-DEFAULT_HTTPS_PORTS = [443, 8443]
+DEFAULT_HTTP_PORTS = {80, 8080}
+DEFAULT_HTTPS_PORTS = {443, 8443}
 
 def split_ports(ports):
     return list(map(int, ports.split(',')))
@@ -42,8 +42,8 @@ def handle_scan(args):
 
     # get urls to screenshot
     if args.all_open:
-        args.ports_http = list(range(2**16))
-        args.ports_https = list(range(2**16))
+        args.ports_http = set(range(2**16))
+        args.ports_https = set(range(2**16))
 
     urls_raw = set()
     for u in args.urls:
@@ -55,7 +55,7 @@ def handle_scan(args):
         urls_raw.update(targets.nmap.from_xml(args.nmap_xml, args.ports_http, args.ports_https))
     urls = set()
     for u in urls_raw:
-        if u.startswith('http'):
+        if u.startswith('http://') or u.startswith('https://'):
             urls.add(u)
         else:
             urls.add('http://'+u)
