@@ -48,7 +48,7 @@ class CaptureService():
         for attempt in range(max_attempts):
             try:
                 res = self.status()
-                self.user_agent = res['userAgentMobile'] if self.mobile else res['userAgent'].replace('HeadlessChrome', 'Chrome')
+                self.user_agent = res['userAgentMobile'] if self.mobile else res['userAgent']
                 logger.debug('Updated User-Agent: '+self.user_agent)
                 return True
             except Exception as e:

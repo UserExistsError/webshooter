@@ -77,6 +77,7 @@ const server = app.listen(port, '127.0.0.1', () => {
 });
 
 var g_browser = undefined;
+var g_userAgent = undefined;
 async function getBrowser() {
     if (g_browser == undefined) {
         g_browser = await puppeteer.launch({
@@ -88,6 +89,8 @@ async function getBrowser() {
                 height: viewPortDims.height
             }
         });
+        const ua = await g_browser.userAgent();
+        g_userAgent = ua.replace('Headless', '');
     }
     return g_browser;
 }
@@ -99,6 +102,7 @@ function sleep(millisec) {
 
 async function capture(context, opts) {
     const page = await context.newPage();
+    await page.setUserAgent(g_userAgent);
 
     // dismiss dialogs. these can hang the screenshot
     page.on('dialog', async dialog => {
