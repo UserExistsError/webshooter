@@ -1,0 +1,37 @@
+# Build
+#     docker build -t webshooter -f Dockerfile.debian .
+
+FROM python:3.9-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    xz-utils \
+    chromium \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+# Install NodeJS
+ARG NODE_VER=v16.13.0
+WORKDIR /web
+RUN curl -O https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-x64.tar.xz && \
+    tar --xz -xvf node-$NODE_VER-linux-x64.tar.xz && \
+    ln -s /web/node-$NODE_VER-linux-x64/bin/node /usr/local/bin/node && \
+    ln -s /web/node-$NODE_VER-linux-x64/bin/npm /usr/local/bin/npm
+
+# Install Node and Python deps
+RUN useradd -d /web -u 99999 web && \
+    chown web:web /web
+ADD --chown=web:web requirements.txt package.json ./
+RUN pip install --no-cache-dir -r requirements.txt
+USER web
+RUN npm install
+ADD --chown=web:web . ./
+
+RUN sed -i "s#args: \[#args: \['--disable-gpu', '--headless', #" js/screen.js
+
+# Add "-p 127.0.0.1:8000:8000/tcp" to your "docker run" and use "python -m http.server 8000"
+# to serve results to the host.
+EXPOSE 8000
+
+ENTRYPOINT [ "/bin/bash" ]
