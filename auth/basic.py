@@ -5,10 +5,10 @@ import urllib.request
 
 logger = logging.getLogger(__name__)
 
-def get_headers(username, password):
+def get_headers(username: str, password: str) -> dict[str, str]:
     return {'Authorization':'Basic '+base64.b64encode((username+':'+password).encode()).decode()}
 
-def login(url, username, password, timeout):
+def login(url: str, username: str, password: str, timeout: int) -> bool:
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE

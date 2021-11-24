@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 JS_TEMPLATE_FILE=os.path.join(os.path.dirname(__file__), 'screen.js')
 
 
-def build(token, port):
+def build(token: str, port: int) -> str:
     js_h, js_tmp = tempfile.mkstemp(prefix='script.', suffix='.js', dir='.')
     os.close(js_h)
 
@@ -21,7 +21,7 @@ def build(token, port):
     return js_tmp
 
 
-def run_background(script_path, node_path='node'):
+def run_background(script_path: str, node_path: str='node') -> subprocess.Popen:
     cmd = [node_path, script_path]
     try:
         return subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT)

@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_HTTP_PORTS = {80, 8080}
 DEFAULT_HTTPS_PORTS = {443, 8443}
 
-def split_ports(ports):
-    return list(map(int, ports.split(',')))
+def split_ports(ports: str) -> set[int]:
+    return set(map(int, ports.split(',')))
 
-def expand_cidr(cidr):
+def expand_cidr(cidr: str) -> list[str]:
     n = netaddr.IPNetwork(cidr)
     return [str(a) for a in n.iter_hosts()]
 
-def process_url(url):
+def process_url(url: str) -> list[str]:
     if url.startswith('http'):
         return [url]
     try:

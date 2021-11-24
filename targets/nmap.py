@@ -1,6 +1,7 @@
+from collections.abc import Collection
 import xml.etree.ElementTree as ET
 
-def from_xml(xml_file, http_ports, https_ports):
+def from_xml(xml_file: str, http_ports: Collection[int], https_ports: Collection[int]) -> list[str]:
     scan = ET.parse(xml_file).getroot()
     if not scan.tag == 'nmaprun':
         raise ValueError('xml file is not nmap format')

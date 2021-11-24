@@ -11,10 +11,11 @@ import urllib.error
 import urllib.request
 import concurrent.futures
 from binascii import hexlify
+from typing import Any
 
 import auth.basic
 import js.script
-from screen.session import Status
+from screen.session import Status, WebShooterSession
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class CaptureError(Exception):
 class CaptureService():
     DEFAULT_RENDER_WAIT_MS = 3000
     DEFAULT_TIMEOUT = 5
-    def __init__(self, node_path, mobile=False, timeout=DEFAULT_TIMEOUT, render_wait_ms=DEFAULT_RENDER_WAIT_MS):
+    def __init__(self, node_path: str, mobile: bool=False, timeout: int=DEFAULT_TIMEOUT, render_wait_ms: int=DEFAULT_RENDER_WAIT_MS):
         self.host = '127.0.0.1'
         self.port = 3000
         self.scheme = 'http'
@@ -40,7 +41,7 @@ class CaptureService():
         self.user_agent = ''
         self.proc = None
         self.script = None
-    def start(self):
+    def start(self) -> bool:
         self.script = js.script.build(self.token, self.port)
         self.proc = js.script.run_background(self.script, self.node_path)
         logger.info('Warming up the headless browser...')
@@ -56,11 +57,11 @@ class CaptureService():
                     logger.error('Failed to check status of capture service: '+str(e))
                 time.sleep(1)
         return False
-    def base_url(self):
+    def base_url(self) -> str:
         return '{}://{}:{}'.format(self.scheme, self.host, self.port)
-    def headers(self):
+    def headers(self) -> str:
         return {'token': self.token, 'content-type': 'application/json'}
-    def capture(self, url, headers):
+    def capture(self, url: str, headers: dict[str, str]) -> dict[str, Any]:
         body = {
             'url': url,
             'mobile': self.mobile,
@@ -92,11 +93,11 @@ class CaptureService():
             logger.debug('Forcibly terminating the capture service')
             self.proc.terminate()
         os.unlink(self.script)
-    def status(self):
+    def status(self) -> dict[str, Any]:
         req = urllib.request.Request(self.base_url() + '/status', headers=self.headers(), method='POST')
         return json.load(urllib.request.urlopen(req, timeout=self.service_timeout))
 
-def image_name_from_url(url):
+def image_name_from_url(url: str) -> str:
     u = urllib.parse.urlparse(url)
     host = u.netloc
     if ':' in host:
@@ -109,7 +110,7 @@ def image_name_from_url(url):
     return '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '')
 
 
-def shoot_thread(url, capcli, session, creds):
+def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession, creds: list[list[str]]):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -223,14 +224,14 @@ def shoot_thread(url, capcli, session, creds):
         logger.error('Failed to add screenshot: '+str(e))
 
 
-def shoot_thread_wrapper(url, capcli, session, creds):
+def shoot_thread_wrapper(url: str, capcli: CaptureService, session: WebShooterSession, creds: list[list[str]]):
     try:
         shoot_thread(url, capcli, session, creds)
     except Exception as e:
         logger.error('Failed on {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
 
-def from_urls(urls, threads, timeout, screen_wait_ms, node_path, session, mobile, creds=None):
+def from_urls(urls: list[str], threads: int, timeout: int, screen_wait_ms: int, node_path: str, session: WebShooterSession, mobile: bool, creds: list[list[str]]=None):
     if len(urls) == 0:
         return
     threads = min(threads, len(urls))

@@ -4,6 +4,7 @@ import sqlite3
 import logging
 import threading
 import urllib.parse
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +17,18 @@ class Status:
 
 class WebShooterSession():
     local = threading.local()
-    def __init__(self, session_file, urls=[]):
+    def __init__(self, session_file: str, urls: list[str]=[]):
         self.connections = 0
         self.session_file = session_file
         if not os.path.exists(session_file):
             logger.info('Creating new session file: '+session_file)
         self.init_db(urls)
-    def get_conn(self):
+    def get_conn(self) -> Any:
         if not getattr(self.local, 'conn', None):
             self.local.conn = sqlite3.connect(self.session_file)
             self.connections += 1
         return self.local.conn
-    def init_db(self, urls):
+    def init_db(self, urls: list[str]):
         conn = self.get_conn()
         with conn:
             conn.execute('''CREATE TABLE IF NOT EXISTS urls
@@ -37,7 +38,7 @@ class WebShooterSession():
             status INTEGER, image TEXT, username TEXT, password TEXT, UNIQUE(url))''')
             conn.executemany('INSERT OR IGNORE INTO urls (url, status) VALUES (?, ?)',
                              [(u, Status.QUEUED) for u in urls])
-    def update_url(self, url, value):
+    def update_url(self, url: str, value: Status):
         conn = self.get_conn()
         with conn:
             conn.execute('UPDATE urls SET status=? WHERE url=?', (value, url))
@@ -51,20 +52,20 @@ class WebShooterSession():
                           screen['headers'], screen['status'], screen['image'],
                           screen['username'], screen['password']))
             conn.execute('UPDATE urls SET status=1 WHERE url=?', (screen['url'],))
-    def url_screen_exists(self, url_final):
+    def url_screen_exists(self, url_final: str):
         conn = self.get_conn()
         with conn:
             cur = conn.execute('SELECT url FROM screens WHERE url_final = ? COLLATE NOCASE', (url_final,))
             return cur.fetchone()
-    def get_queued_urls(self):
+    def get_queued_urls(self) -> list[str]:
         conn = self.get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.QUEUED,))
         return [r[1] for r in cursor.fetchall()]
-    def get_failed_urls(self):
+    def get_failed_urls(self) -> list[str]:
         conn = self.get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.ERROR,))
         return [r[1] for r in cursor.fetchall()]
-    def normalize_url(self, u, ignore_params=False):
+    def normalize_url(self, u: str, ignore_params: bool=False) -> str:
         p = urllib.parse.urlparse(u)
         port = p.port
         if port is None:
@@ -75,7 +76,7 @@ class WebShooterSession():
             else:
                 port = ''
         return '{}://{}:{}/{}?{}'.format(p.scheme, p.hostname, port, p.path.strip('/'), '' if ignore_params else p.query)
-    def get_results(self, ignore_errors=False, unique=True):
+    def get_results(self, ignore_errors: bool=False, unique: bool=True) -> list[dict[str, Any]]:
         conn = self.get_conn()
         if ignore_errors:
             cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens WHERE status >= 200 AND status < 400 ORDER BY title, server ASC')
