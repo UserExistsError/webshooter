@@ -57,9 +57,9 @@ class CaptureService():
                     logger.error('Failed to check status of capture service: '+str(e))
                 time.sleep(1)
         return False
-    def base_url(self) -> str:
+    def _base_url(self) -> str:
         return '{}://{}:{}'.format(self.scheme, self.host, self.port)
-    def headers(self) -> str:
+    def _headers(self) -> str:
         return {'token': self.token, 'content-type': 'application/json'}
     def capture(self, url: str, headers: dict[str, str]) -> dict[str, Any]:
         body = {
@@ -69,7 +69,7 @@ class CaptureService():
             'headers': headers,
             'timeout_ms': self.page_load_timeout_ms
         }
-        req = urllib.request.Request(self.base_url() + '/capture', data=json.dumps(body).encode(), headers=self.headers(), method='POST')
+        req = urllib.request.Request(self._base_url() + '/capture', data=json.dumps(body).encode(), headers=self._headers(), method='POST')
         err = None
         try:
             with urllib.request.urlopen(req, timeout=self.service_timeout) as resp:
@@ -83,7 +83,7 @@ class CaptureService():
         raise CaptureError(err)
     def shutdown(self):
         try:
-            req = urllib.request.Request(self.base_url() + '/shutdown', headers=self.headers(), method='POST')
+            req = urllib.request.Request(self._base_url() + '/shutdown', headers=self._headers(), method='POST')
             resp = urllib.request.urlopen(req, timeout=self.service_timeout)
         except:
             logger.error('Failed to gracefully terminate capture service')
@@ -94,7 +94,7 @@ class CaptureService():
             self.proc.terminate()
         os.unlink(self.script)
     def status(self) -> dict[str, Any]:
-        req = urllib.request.Request(self.base_url() + '/status', headers=self.headers(), method='POST')
+        req = urllib.request.Request(self._base_url() + '/status', headers=self._headers(), method='POST')
         return json.load(urllib.request.urlopen(req, timeout=self.service_timeout))
 
 def image_name_from_url(url: str) -> str:
@@ -110,84 +110,25 @@ def image_name_from_url(url: str) -> str:
     return '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '')
 
 
-def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession, creds: list[list[str]]):
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    headers = {'User-Agent': capcli.user_agent}
-    if creds is None:
-        creds = []
-
-    username, password = None, None
-    screen = {'username': None, 'password': None}
-    ssl_version_error = False
-
-    for i in range(len(creds)+1):
-        req = urllib.request.Request(url, headers=headers)
-        try:
-            resp = urllib.request.urlopen(req, timeout=capcli.service_timeout, context=ctx)
-        except urllib.error.HTTPError as e:
-            logger.error('GET {} - {}'.format(url, str(e)))
-            resp = e
-        except urllib.error.URLError as e:
-            logger.error('GET {} - {}'.format(url, str(e)))
-            if 'unsupported protocol' in str(e).lower():
-                ssl_version_error = True
-                break
-            session.update_url(url, Status.INVALID)
-            return
-        except Exception as e:
-            logger.error('GET {} - {}'.format(url, str(e)))
-            session.update_url(url, Status.INVALID)
-            return
-
-        if resp.getcode() == 401:
-            if i == len(creds):
-                # no more creds to try
-                break
-            username, password = None, None
-            for h, v in resp.getheaders():
-                if h.lower() == 'www-authenticate' and v.lower().startswith('basic '):
-                    username, password = creds[i][0], creds[i][1]
-                    headers.update(auth.basic.get_headers(username, password))
-                    logger.debug('Trying "{}", "{}": {}'.format(username, password, url))
-            if username is None:
-                # no basic auth header
-                break
-        elif 'Authorization' in headers:
-            logger.debug('Creds valid: "{}", "{}": {}'.format(username, password, url))
-            screen['username'] = username
-            screen['password'] = password
-            break
-
-    # get final url after following redirects
-    if ssl_version_error:
-        target_url = url
-    else:
-        target_url = resp.geturl()
-        if url.lower() != target_url.lower():
-            logger.debug('Redirected: {} -> {}'.format(url, target_url))
-
+def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession):
     # check if final url was already captured. there is a race condition here with multiple workers
     # but report generation will catch it.
-    if session.url_screen_exists(target_url):
-        logger.info('Already got a screenshot of {} -> {}'.format(url, target_url))
+    if session.url_screen_exists(url):
+        logger.info('Already got a screenshot of {} -> {}'.format(url, url))
         session.update_url(url, Status.DUPLICATE)
         return
 
     # get screenshot
     headers = {}
-    if screen['username'] is not None:
-        headers = auth.basic.get_headers(screen['username'], screen['password'])
 
-    logger.info('Taking screenshot: '+target_url)
+    logger.info('Taking screenshot: '+url)
     try:
-        page_info = capcli.capture(target_url, headers)
+        page_info = capcli.capture(url, headers)
         if len(page_info['image']) == 0:
             raise ValueError('got zero-length image')
         #logger.debug(page_info)
     except CaptureError as e:
-        logger.error('Failed to take screenshot for {}: {}'.format(target_url, str(e)))
+        logger.error('Failed to take screenshot for {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
         return
 
@@ -204,11 +145,17 @@ def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession, c
     server = page_info['headers'].get('server', '')
     status = page_info.get('status', -1)
     url_final = page_info.get('url_final', '')
+    if url != url_final:
+        logger.debug('Redirected: {} -> {}'.format(url, url_final))
+    if session.url_screen_exists(url_final):
+        logger.info('Already got a screenshot of {} -> {}'.format(url, url_final))
+        session.update_url(url, Status.DUPLICATE)
+        return
     headers = [(k, page_info['headers'][k]) for k in page_info['headers']]
 
     logger.debug('[{}] GET {} : title="{}", server="{}"'.format(status, url_final, title, server))
 
-    screen.update({
+    screen = {
         'url': url,
         'url_final': url_final,
         'title': title,
@@ -216,7 +163,7 @@ def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession, c
         'status': status,
         'image': os.path.basename(img_file),
         'headers': json.dumps(list(sorted(headers, key=lambda h: h[0]))) # alphabetic sort on header name
-    })
+    }
 
     try:
         session.add_screen(screen)
@@ -224,14 +171,14 @@ def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession, c
         logger.error('Failed to add screenshot: '+str(e))
 
 
-def shoot_thread_wrapper(url: str, capcli: CaptureService, session: WebShooterSession, creds: list[list[str]]):
+def shoot_thread_wrapper(url: str, capcli: CaptureService, session: WebShooterSession):
     try:
-        shoot_thread(url, capcli, session, creds)
+        shoot_thread(url, capcli, session)
     except Exception as e:
         logger.error('Failed on {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
 
-def from_urls(urls: list[str], threads: int, timeout: int, screen_wait_ms: int, node_path: str, session: WebShooterSession, mobile: bool, creds: list[list[str]]=None):
+def from_urls(urls: list[str], threads: int, timeout: int, screen_wait_ms: int, node_path: str, session: WebShooterSession, mobile: bool):
     if len(urls) == 0:
         return
     threads = min(threads, len(urls))
@@ -245,7 +192,7 @@ def from_urls(urls: list[str], threads: int, timeout: int, screen_wait_ms: int, 
     work = []
     logger.debug('Scanning with {} worker(s)'.format(threads))
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as e:
-        work = [e.submit(shoot_thread_wrapper, u, capcli, session, creds) for u in urls]
+        work = [e.submit(shoot_thread_wrapper, u, capcli, session) for u in urls]
         logger.debug('Waiting for workers to finish')
         try:
             while len(work):

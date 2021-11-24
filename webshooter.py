@@ -6,6 +6,7 @@ import logging
 import netaddr
 import argparse
 
+import urllib.parse
 import targets.nmap
 import report.generate
 import screen.shoot
@@ -34,6 +35,7 @@ def process_url(url: str) -> list[str]:
     # probably a url w/o scheme
     return [url]
 
+
 def handle_scan(args):
     # verify node exists
     if shutil.which(args.node_path) is None:
@@ -55,11 +57,19 @@ def handle_scan(args):
         urls_raw.update(targets.nmap.from_xml(args.nmap_xml, args.ports_http, args.ports_https))
     urls = set()
     for u in urls_raw:
-        if u.startswith('http://') or u.startswith('https://'):
-            urls.add(u)
+        r = urllib.parse.urlparse(u)
+        if not r.scheme:
+            if not urllib.parse.urlparse('https://'+u).netloc:
+                logger.error('invalid URL host: %s', u)
+            else:
+                urls.add('http://'+u)
+                urls.add('https://'+u)
+        elif not r.netloc:
+            logger.error('invalid URL host: %s', u)
+        elif r.scheme not in {'http', 'https'}:
+            logger.error('invalid URL scheme: %s', u)
         else:
-            urls.add('http://'+u)
-            urls.add('https://'+u)
+            urls.add(u)
 
     # shoot the pages and generate html report
     session = screen.session.WebShooterSession(args.session, urls)
@@ -67,12 +77,8 @@ def handle_scan(args):
     if args.retry:
         urls.extend(session.get_failed_urls())
 
-    creds = []
-    if args.creds:
-        creds = json.loads(open(args.creds).read())
-
     print('Shooting {} url(s)'.format(len(urls)))
-    screen.shoot.from_urls(urls, args.threads, args.timeout, args.screen_wait, args.node_path, session, args.mobile, creds)
+    screen.shoot.from_urls(urls, args.threads, args.timeout, args.screen_wait, args.node_path, session, args.mobile)
 
 def handle_report(args):
     template = Template.SingleColumn if args.column else Template.Tiles
@@ -104,7 +110,6 @@ if __name__ == '__main__':
     scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait', default=2000, type=int, help='wait in millisecs between page load and screenshot')
     scan_parser.add_argument('--mobile', action='store_true', help='Emulate mobile device')
     scan_parser.add_argument('-r', '--retry', action='store_true', help='retry failed urls')
-    scan_parser.add_argument('-c', '--creds', help='json file for basic auth: [["user", "pass"], ...]')
     scan_parser.add_argument('--ports-http', dest='ports_http', default=DEFAULT_HTTP_PORTS,
                         type=split_ports, help='comma-separated')
     scan_parser.add_argument('--ports-https', dest='ports_https', default=DEFAULT_HTTPS_PORTS,

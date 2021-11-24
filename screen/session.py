@@ -22,50 +22,49 @@ class WebShooterSession():
         self.session_file = session_file
         if not os.path.exists(session_file):
             logger.info('Creating new session file: '+session_file)
-        self.init_db(urls)
-    def get_conn(self) -> Any:
+        self._init_db(urls)
+    def _get_conn(self) -> Any:
         if not getattr(self.local, 'conn', None):
             self.local.conn = sqlite3.connect(self.session_file)
             self.connections += 1
         return self.local.conn
-    def init_db(self, urls: list[str]):
-        conn = self.get_conn()
+    def _init_db(self, urls: list[str]):
+        conn = self._get_conn()
         with conn:
             conn.execute('''CREATE TABLE IF NOT EXISTS urls
             (id INTEGER PRIMARY KEY, url TEXT, status INTEGER, UNIQUE(url))''')
             conn.execute('''CREATE TABLE IF NOT EXISTS screens
             (id INTEGER PRIMARY KEY, url TEXT, url_final TEXT, title TEXT, server TEXT, headers TEXT,
-            status INTEGER, image TEXT, username TEXT, password TEXT, UNIQUE(url))''')
+            status INTEGER, image TEXT, UNIQUE(url))''')
             conn.executemany('INSERT OR IGNORE INTO urls (url, status) VALUES (?, ?)',
                              [(u, Status.QUEUED) for u in urls])
     def update_url(self, url: str, value: Status):
-        conn = self.get_conn()
+        conn = self._get_conn()
         with conn:
             conn.execute('UPDATE urls SET status=? WHERE url=?', (value, url))
     def add_screen(self, screen):
-        conn = self.get_conn()
+        conn = self._get_conn()
         with conn:
             conn.execute('''INSERT OR IGNORE INTO screens
-            (url, url_final, title, server, headers, status, image, username, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (url, url_final, title, server, headers, status, image)
+            VALUES (?, ?, ?, ?, ?, ?, ?)''',
                          (screen['url'], screen['url_final'], screen['title'], screen['server'],
-                          screen['headers'], screen['status'], screen['image'],
-                          screen['username'], screen['password']))
+                          screen['headers'], screen['status'], screen['image']))
             conn.execute('UPDATE urls SET status=1 WHERE url=?', (screen['url'],))
     def url_screen_exists(self, url_final: str):
-        conn = self.get_conn()
+        conn = self._get_conn()
         with conn:
             cur = conn.execute('SELECT url FROM screens WHERE url_final = ? COLLATE NOCASE', (url_final,))
             return cur.fetchone()
     def get_queued_urls(self) -> list[str]:
-        conn = self.get_conn()
+        conn = self._get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.QUEUED,))
         return [r[1] for r in cursor.fetchall()]
     def get_failed_urls(self) -> list[str]:
-        conn = self.get_conn()
+        conn = self._get_conn()
         cursor = conn.execute('SELECT * FROM urls WHERE status = ?', (Status.ERROR,))
         return [r[1] for r in cursor.fetchall()]
-    def normalize_url(self, u: str, ignore_params: bool=False) -> str:
+    def _normalize_url(self, u: str, ignore_params: bool=False) -> str:
         p = urllib.parse.urlparse(u)
         port = p.port
         if port is None:
@@ -77,7 +76,7 @@ class WebShooterSession():
                 port = ''
         return '{}://{}:{}/{}?{}'.format(p.scheme, p.hostname, port, p.path.strip('/'), '' if ignore_params else p.query)
     def get_results(self, ignore_errors: bool=False, unique: bool=True) -> list[dict[str, Any]]:
-        conn = self.get_conn()
+        conn = self._get_conn()
         if ignore_errors:
             cursor = conn.execute('SELECT url, url_final, title, server, headers, status, image FROM screens WHERE status >= 200 AND status < 400 ORDER BY title, server ASC')
         else:
@@ -89,6 +88,6 @@ class WebShooterSession():
         } for r in cursor.fetchall()]
         if unique:
             # XXX there is an issue here because mobile emulation may result in a final url of "about:blank"
-            uniq = {self.normalize_url(r['url_final']): r for r in results}
+            uniq = {self._normalize_url(r['url_final']): r for r in results}
             results = uniq.values()
         return results
