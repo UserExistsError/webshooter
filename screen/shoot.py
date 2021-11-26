@@ -56,6 +56,7 @@ class CaptureService():
                 if 'connection refused' not in str(e).lower():
                     logger.error('Failed to check status of capture service: '+str(e))
                 time.sleep(1)
+        self.shutdown()
         return False
     def _base_url(self) -> str:
         return '{}://{}:{}'.format(self.scheme, self.host, self.port)

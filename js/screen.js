@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer');
 const devices = puppeteer.devices;
-const fs = require('fs');
 
 const express = require('express');
 const app = express();
@@ -46,7 +45,7 @@ app.post('/capture', async (req, res) => {
         let page_info = await capture(context, req.body);
         res.json(page_info);
     } catch (err) {
-        res.status(500).json({'error': err});
+        res.status(500).json({error: err});
     }
     await context.close();
 });
@@ -63,38 +62,55 @@ app.post('/shutdown', async (req, res) => {
 });
 
 app.post('/status', async (req, res) => {
-    let browser = await getBrowser();
-    res.json({
-        userAgent: await browser.userAgent(),
-        userAgentMobile: devices['iPhone X']['userAgent'],
-        viewPort: viewPortDims,
-        viewPortMobile: devices['iPhone X']['viewport']
-    });
+    getUserAgent().then(userAgent => {
+        res.json({
+            userAgent: userAgent,
+            userAgentMobile: devices['iPhone X']['userAgent'],
+            viewPort: viewPortDims,
+            viewPortMobile: devices['iPhone X']['viewport']
+        });
+    }).catch(err => {
+        res.status(500).json({error: err})
+    })
 });
 
 const server = app.listen(port, '127.0.0.1', () => {
     console.log('Started capture service on', port);
 });
 
-var g_browser = undefined;
-var g_userAgent = undefined;
-async function getBrowser() {
-    if (g_browser == undefined) {
-        g_browser = await puppeteer.launch({
-            args: ['--no-sandbox'],
-            ignoreHTTPSErrors: true,
-            headless: true,
-            defaultViewport: {
-                width: viewPortDims.width,
-                height: viewPortDims.height
-            }
-        });
-        const ua = await g_browser.userAgent();
-        g_userAgent = ua.replace('Headless', '');
+var getBrowser = function() {
+    let browser = undefined;
+    let cliArgs = [];
+    if (process.env.WEBSHOOTER_DOCKER === 'yes') {
+        // This was necessary even after following the docs
+        // https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-in-docker
+        cliArgs.push('--no-sandbox');
     }
-    return g_browser;
-}
+    return (async function() {
+        if (browser == undefined) {
+            browser = await puppeteer.launch({
+                args: cliArgs,
+                ignoreHTTPSErrors: true,
+                defaultViewport: {
+                    width: viewPortDims.width,
+                    height: viewPortDims.height
+                }
+            });
+        }
+        return browser;
+    });
+}();
 
+var getUserAgent = function() {
+    let userAgent = undefined;
+    return (async function() {
+        if (userAgent == undefined) {
+            const userAgentHeadless = await getBrowser().then(browser => browser.userAgent());
+            userAgent = userAgentHeadless.replace('Headless', '');
+        }
+        return userAgent;
+    });
+}();
 
 function sleep(millisec) {
     return new Promise(resolve => setTimeout(resolve, millisec));
@@ -102,7 +118,6 @@ function sleep(millisec) {
 
 async function capture(context, opts) {
     const page = await context.newPage();
-    await page.setUserAgent(g_userAgent);
 
     // dismiss dialogs. these can hang the screenshot
     page.on('dialog', async dialog => {
@@ -113,6 +128,9 @@ async function capture(context, opts) {
     if (opts.mobile) {
         // see https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts
         page.emulate(devices['iPhone X']);
+    } else {
+        const userAgent = await getUserAgent();
+        await page.setUserAgent(userAgent);
     }
     var success = false;
     const waitEvents = ['load', 'domcontentloaded', 'networkidle2'];
