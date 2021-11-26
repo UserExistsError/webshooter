@@ -8,15 +8,16 @@ Take screenshots of web sites and generate an HTML report. This tool waits a spe
 
 ### Manual Install
 
-Requires python3.9+, nodejs, and npm. Puppeteer is used for rendering pages and taking screenshots. Jinja2 is used for html and javascript templating.
+Requires python3.9+, nodejs, and npm. Puppeteer is used for rendering pages and taking screenshots. Jinja2 is used for html and JavaScript templating.
 
-Get node from here https://nodejs.org/ and extract it. Add the bin directory (contains node and npm) to your PATH.
+Get the latest Node LTS from here https://nodejs.org/ and extract it. Add the bin directory (contains node and npm) to your PATH. Testing has been done
+with Node 16.x.
 
 Install remaining requirements:
 
 ```
 npm install
-pip3 install -r requirements.txt
+python setup.py install
 ```
 
 ### Docker

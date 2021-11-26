@@ -112,10 +112,9 @@ def image_name_from_url(url: str) -> str:
 
 
 def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession):
-    # check if final url was already captured. there is a race condition here with multiple workers
-    # but report generation will catch it.
+    # Handle case where a URL was already captured. This might occur if another URL redirected to it.
     if session.url_screen_exists(url):
-        logger.info('Already got a screenshot of {} -> {}'.format(url, url))
+        logger.info('Already got a screenshot of {}'.format(url))
         session.update_url(url, Status.DUPLICATE)
         return
 
