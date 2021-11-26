@@ -13,7 +13,6 @@ import concurrent.futures
 from binascii import hexlify
 from typing import Any
 
-import auth.basic
 import js.script
 from screen.session import Status, WebShooterSession
 

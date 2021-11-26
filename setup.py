@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     python_requires='>=3.9',
     install_requires=[
-        'Jinja2>=3,<4',
+        'Jinja2>=2,<4',
         'netaddr'
     ],
     package_data={

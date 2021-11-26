@@ -17,8 +17,11 @@ Install remaining requirements:
 
 ```
 npm install
-python setup.py install
+pip3 install -r requirements.txt
 ```
+
+`npm install` will create a `node_modules/` directory with its dependencies. Webshooter needs to be able to find this directory when it runs. You
+can run webshooter in the same directory you ran `npm install` from (or a subdirectory), or you can specify `NODE_PATH=/path/to/node_modules` when running.
 
 ### Docker
 
