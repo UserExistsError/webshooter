@@ -1,7 +1,7 @@
 from collections.abc import Collection
 import xml.etree.ElementTree as ET
 
-def from_xml(xml_file: str, http_ports: Collection[int], https_ports: Collection[int]) -> list[str]:
+def from_xml(xml_file: str, http_ports: Collection[int], https_ports: Collection[int]) -> set[str]:
     scan = ET.parse(xml_file).getroot()
     if not scan.tag == 'nmaprun':
         raise ValueError('xml file is not nmap format')
@@ -25,4 +25,4 @@ def from_xml(xml_file: str, http_ports: Collection[int], https_ports: Collection
                     urls.add('https://{}/'.format(name))
                 else:
                     urls.add('https://{}:{}/'.format(name, p))
-    return list(urls)
+    return urls

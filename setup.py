@@ -9,8 +9,7 @@ setup(
     packages=find_packages(),
     python_requires='>=3.9',
     install_requires=[
-        'Jinja2>=2,<4',
-        'netaddr'
+        'Jinja2>=2,<4'
     ],
     package_data={
         'report': ['*.css', '*.js', 'templates/*.html'],

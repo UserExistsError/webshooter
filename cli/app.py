@@ -2,11 +2,10 @@ import sys
 import json
 import shutil
 import logging
-import netaddr
 import argparse
 
-import urllib.parse
 import targets.nmap
+import targets.urls
 import report.generate
 import screen.shoot
 import screen.session
@@ -20,21 +19,6 @@ DEFAULT_HTTPS_PORTS = {443, 8443}
 def split_ports(ports: str) -> set[int]:
     return set(map(int, ports.split(',')))
 
-def expand_cidr(cidr: str) -> list[str]:
-    n = netaddr.IPNetwork(cidr)
-    return [str(a) for a in n.iter_hosts()]
-
-def process_url(url: str) -> list[str]:
-    if url.startswith('http'):
-        return [url]
-    try:
-        return expand_cidr(url)
-    except:
-        pass
-    # probably a url w/o scheme
-    return [url]
-
-
 def handle_scan(args):
     # verify node exists
     if shutil.which(args.node_path) is None:
@@ -46,38 +30,41 @@ def handle_scan(args):
         args.ports_http = set(range(2**16))
         args.ports_https = set(range(2**16))
 
-    urls_raw = set()
-    for u in args.urls:
-        urls_raw.update(process_url(u.strip()))
-    if args.url_file:
-        for u in open(args.url_file):
-            urls_raw.update(process_url(u.strip()))
-    if args.nmap_xml:
-        urls_raw.update(targets.nmap.from_xml(args.nmap_xml, args.ports_http, args.ports_https))
     urls = set()
-    for u in urls_raw:
-        r = urllib.parse.urlparse(u)
-        if not r.scheme:
-            if not urllib.parse.urlparse('https://'+u).netloc:
-                logger.error('invalid URL host: %s', u)
-            else:
-                urls.add('http://'+u)
-                urls.add('https://'+u)
-        elif not r.netloc:
-            logger.error('invalid URL host: %s', u)
-        elif r.scheme not in {'http', 'https'}:
-            logger.error('invalid URL scheme: %s', u)
-        else:
-            urls.add(u)
+    if args.urls:
+        urls.update(targets.urls.from_collection(args.urls))
+    if args.url_file:
+        urls.update(targets.urls.from_file(args.url_file))
+    if args.nmap_xml:
+        urls.update(targets.nmap.from_xml(args.nmap_xml, args.ports_http, args.ports_https))
 
-    # shoot the pages and generate html report
+    # The session will dedupe URLs. We add failed URLs back in if requested.
     session = screen.session.WebShooterSession(args.session, urls)
-    urls = session.get_queued_urls()
+    urls = set(session.get_queued_urls())
     if args.retry:
-        urls.extend(session.get_failed_urls())
+        failed_urls = session.get_failed_urls()
+        print('Retrying {} failed URL(s)'.format(len(failed_urls)))
+        for u in failed_urls:
+            logger.debug('retrying failed URL: %s', u)
+        urls.update(failed_urls)
 
     print('Shooting {} url(s)'.format(len(urls)))
-    screen.shoot.from_urls(urls, args.threads, args.timeout, args.screen_wait, args.node_path, session, args.mobile)
+
+    if args.dryrun:
+        for u in urls:
+            print('Shooting', u)
+        return
+
+    if len(urls) == 0:
+        return
+
+    with screen.shoot.CaptureService(
+        args.node_path,
+        mobile=args.mobile,
+        timeout=args.timeout,
+        render_wait_ms=args.screen_wait
+    ) as capsvc:
+        screen.shoot.capture_from_urls(urls, args.threads, session, capsvc)
 
 def handle_report(args):
     template = Template.SingleColumn if args.column else Template.Tiles
@@ -115,6 +102,7 @@ def run():
                         type=split_ports, help='comma-separated')
     scan_parser.add_argument('--all-open', dest='all_open', action='store_true', help='scan all open ports')
     scan_parser.add_argument('urls', default=[], nargs='*', help='urls including scheme')
+    scan_parser.add_argument('--dryrun', action='store_true', help='list URLs to scan')
 
     # report
     report_parser = subparsers.add_parser('report', help='Generate report')
@@ -126,7 +114,6 @@ def run():
     report_parser.add_argument('--embed-images', dest='embed_images', action='store_true', help='Embed images in HTML as base64')
 
     args = parser.parse_args()
-
     if args.debug or args.verbose:
         h = logging.StreamHandler()
         h.setFormatter(logging.Formatter('[%(levelname)s] %(filename)s:%(lineno)s %(message)s'))

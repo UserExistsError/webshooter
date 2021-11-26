@@ -40,6 +40,11 @@ class CaptureService():
         self.user_agent = ''
         self.proc = None
         self.script = None
+    def __enter__(self) -> 'CaptureService':
+        self.start()
+        return self
+    def __exit__(self, type, value, traceback):
+        self.shutdown()
     def start(self) -> bool:
         self.script = js.script.build(self.token, self.port)
         self.proc = js.script.run_background(self.script, self.node_path)
@@ -74,14 +79,21 @@ class CaptureService():
         try:
             with urllib.request.urlopen(req, timeout=self.service_timeout) as resp:
                 if 200 <= resp.status < 300:
-                    return json.load(resp)
-                err = json.load(resp)['error']
+                    page_info = json.load(resp)
+                    if len(page_info['image']) == 0:
+                        err = 'got zero-length image'
+                    else:
+                        return page_info
+                else:
+                    err = json.load(resp)['error']
         except urllib.error.HTTPError as e:
             err = json.load(e)['error']
         except Exception as e:
             err = str(e)
         raise CaptureError(err)
     def shutdown(self):
+        if not self.proc:
+            return
         try:
             req = urllib.request.Request(self._base_url() + '/shutdown', headers=self._headers(), method='POST')
             resp = urllib.request.urlopen(req, timeout=self.service_timeout)
@@ -92,7 +104,11 @@ class CaptureService():
         except subprocess.TimeoutExpired:
             logger.debug('Forcibly terminating the capture service')
             self.proc.terminate()
-        os.unlink(self.script)
+        self.proc = None
+        try:
+            os.unlink(self.script)
+        except FileNotFoundError:
+            pass
     def status(self) -> dict[str, Any]:
         req = urllib.request.Request(self._base_url() + '/status', headers=self._headers(), method='POST')
         return json.load(urllib.request.urlopen(req, timeout=self.service_timeout))
@@ -110,8 +126,9 @@ def image_name_from_url(url: str) -> str:
     return '{}-{}-{}'.format(u.scheme, host, port).replace('/', '').replace('\\', '')
 
 
-def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession):
-    # Handle case where a URL was already captured. This might occur if another URL redirected to it.
+def shoot_thread(url: str, capsvc: CaptureService, session: WebShooterSession):
+    # Handle case where a URL was already captured. We dedupe URLs before attempting screenshots but
+    # another URL that was captured in this run may have redirected to this URL.
     if session.url_screen_exists(url):
         logger.info('Already got a screenshot of {}'.format(url))
         session.update_url(url, Status.DUPLICATE)
@@ -122,13 +139,18 @@ def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession):
 
     logger.info('Taking screenshot: '+url)
     try:
-        page_info = capcli.capture(url, headers)
-        if len(page_info['image']) == 0:
-            raise ValueError('got zero-length image')
-        #logger.debug(page_info)
+        page_info = capsvc.capture(url, headers)
     except CaptureError as e:
         logger.error('Failed to take screenshot for {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
+        return
+
+    url_final = page_info['url_final']
+    if url != url_final:
+        logger.debug('Redirected: {} -> {}'.format(url, url_final))
+    if session.url_screen_exists(url_final):
+        logger.info('Already got a screenshot of {}'.format(url_final))
+        session.update_url(url, Status.DUPLICATE)
         return
 
     try:
@@ -143,13 +165,6 @@ def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession):
     title = page_info.get('title', '')
     server = page_info['headers'].get('server', '')
     status = page_info.get('status', -1)
-    url_final = page_info.get('url_final', '')
-    if url != url_final:
-        logger.debug('Redirected: {} -> {}'.format(url, url_final))
-    if session.url_screen_exists(url_final):
-        logger.info('Already got a screenshot of {} -> {}'.format(url, url_final))
-        session.update_url(url, Status.DUPLICATE)
-        return
     headers = [(k, page_info['headers'][k]) for k in page_info['headers']]
 
     logger.debug('[{}] GET {} : title="{}", server="{}"'.format(status, url_final, title, server))
@@ -170,28 +185,22 @@ def shoot_thread(url: str, capcli: CaptureService, session: WebShooterSession):
         logger.error('Failed to add screenshot: '+str(e))
 
 
-def shoot_thread_wrapper(url: str, capcli: CaptureService, session: WebShooterSession):
+def shoot_thread_wrapper(url: str, capsvc: CaptureService, session: WebShooterSession):
     try:
-        shoot_thread(url, capcli, session)
+        shoot_thread(url, capsvc, session)
     except Exception as e:
         logger.error('Failed on {}: {}'.format(url, str(e)))
         session.update_url(url, Status.ERROR)
 
-def from_urls(urls: list[str], threads: int, timeout: int, screen_wait_ms: int, node_path: str, session: WebShooterSession, mobile: bool):
+def capture_from_urls(urls: list[str], threads: int, session: WebShooterSession, capsvc: CaptureService):
     if len(urls) == 0:
         return
     threads = min(threads, len(urls))
 
-    # start node server for taking capture requests
-    capcli = CaptureService(node_path, mobile=mobile, timeout=timeout, render_wait_ms=screen_wait_ms)
-    if not capcli.start():
-        logger.error('Failed to start capture service')
-        return
-
     work = []
     logger.debug('Scanning with {} worker(s)'.format(threads))
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as e:
-        work = [e.submit(shoot_thread_wrapper, u, capcli, session) for u in urls]
+        work = [e.submit(shoot_thread_wrapper, u, capsvc, session) for u in urls]
         logger.debug('Waiting for workers to finish')
         try:
             while len(work):
@@ -200,5 +209,3 @@ def from_urls(urls: list[str], threads: int, timeout: int, screen_wait_ms: int, 
             print('Aborting! Cancelling workers...')
             for w in work:
                 w.cancel()
-
-    capcli.shutdown()
