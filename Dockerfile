@@ -1,3 +1,5 @@
+# https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-on-alpine
+
 FROM python:3.9-alpine3.14
 
 RUN apk add --no-cache \
@@ -5,21 +7,29 @@ RUN apk add --no-cache \
     npm \
     chromium
 
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    ENV=.profile \
+    WEBSHOOTER_DOCKER=yes
+
+ARG USER=websh
+
+# add new user
 WORKDIR /web
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN addgroup -S -g 99999 $USER && \
+    adduser -S -G $USER -h /web -D -u 99999 $USER
+USER $USER
 
-RUN adduser -h /web -D -u 99999 web
-ADD --chown=web:web package.json ./
-USER web
-RUN sed -i "s/puppeteer/puppeteer-core/" package.json && \
-    npm install
-ADD --chown=web:web . ./
+# install python and node dependencies
+ADD --chown=$USER:$USER requirements.txt package.json ./
+RUN python -m venv .webshooter && \
+    source .webshooter/bin/activate && \
+    pip install --no-cache-dir -r requirements.txt && \
+    echo "source .webshooter/bin/activate" > .profile
+RUN npm install
 
-# replace chrome path with system version
-RUN sed -i "s#args: \[#args: \['--disable-gpu', '--headless', #" js/screen.js && \
-    sed -i "s#ignoreHTTPSErrors:#executablePath: '/usr/bin/chromium-browser', ignoreHTTPSErrors:#" js/screen.js && \
-    sed -i "s#require('puppeteer')#require('puppeteer-core')#" js/screen.js
+# copy the app
+ADD --chown=$USER:$USER . ./
 
 # can run "python3 -m http.server" to browse html report at "http://localhost:8000/page.0.html"
 # docker run -p 127.0.0.1:8000:8000/tcp -it IMAGE
