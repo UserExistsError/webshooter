@@ -151,7 +151,6 @@ async function capture(context, opts) {
     if (!success) {
         throw 'failed to navigate to URL';
     }
-
     // give page time to render
     let page_info = {
         url_final: page.url(),
@@ -164,8 +163,6 @@ async function capture(context, opts) {
     await sleep(opts.render_wait_ms);
     page_info.image = await page.screenshot({
         encoding: 'base64',
-        //path: opts.image_path,
-        //fullPage: true
         clip: {
             x: 0,
             y: 0,

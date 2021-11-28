@@ -14,7 +14,6 @@ JS_TEMPLATE_FILE=os.path.join(os.path.dirname(__file__), 'screen.js')
 def build(token: str, port: int) -> str:
     js_h, js_tmp = tempfile.mkstemp(prefix='script.', suffix='.js', dir='.')
     os.close(js_h)
-
     script = jinja2.Template(open(JS_TEMPLATE_FILE, 'rb').read().decode())
     rendered = script.render(token=token, port=port)
     open(js_tmp, 'wb').write(rendered.encode())

@@ -9,6 +9,7 @@ import targets.urls
 import report.generate
 import screen.shoot
 import screen.session
+import screen.capture
 from report.template import Template
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def handle_scan(args):
 
     urls = set()
     if args.urls:
-        urls.update(targets.urls.from_collection(args.urls))
+        urls.update(targets.urls.from_iterator(args.urls))
     if args.url_file:
         urls.update(targets.urls.from_file(args.url_file))
     if args.nmap_xml:
@@ -48,7 +49,7 @@ def handle_scan(args):
             logger.debug('retrying failed URL: %s', u)
         urls.update(failed_urls)
 
-    print('Shooting {} url(s)'.format(len(urls)))
+    print('Shooting {} URL(s)'.format(len(urls)))
 
     if args.dryrun:
         for u in urls:
@@ -58,13 +59,9 @@ def handle_scan(args):
     if len(urls) == 0:
         return
 
-    with screen.shoot.CaptureService(
-        args.node_path,
-        mobile=args.mobile,
-        timeout=args.timeout,
-        render_wait_ms=args.screen_wait
-    ) as capsvc:
-        screen.shoot.capture_from_urls(urls, args.threads, session, capsvc)
+    with screen.capture.CaptureService(args.node_path) as client:
+        client.configure(args.mobile, args.screen_wait_ms, args.page_wait_ms)
+        screen.shoot.capture_from_urls(urls, args.threads, session, client)
 
 def handle_report(args):
     template = Template.SingleColumn if args.column else Template.Tiles
@@ -91,9 +88,9 @@ def run():
     scan_parser.add_argument('-x', '--nmap-xml', dest='nmap_xml', help='nmap xml')
     scan_parser.add_argument('-u', '--url-file', dest='url_file', help='urls 1 per line. include scheme')
     scan_parser.add_argument('-n', '--node-path', dest='node_path', default='node', help='nodejs path')
-    scan_parser.add_argument('-t', '--timeout', default=5, type=int, help='timeout in seconds')
     scan_parser.add_argument('-w', '--threads', default=5, type=int, help='number of concurrent screenshots to take. default 5')
-    scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait', default=2000, type=int, help='wait in millisecs between page load and screenshot')
+    scan_parser.add_argument('-t', '--page-timeout', dest='page_wait_ms', default=5000, type=int, help='timeout in millisecs for page load event')
+    scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait_ms', default=2000, type=int, help='wait in millisecs between page load and screenshot')
     scan_parser.add_argument('--mobile', action='store_true', help='Emulate mobile device')
     scan_parser.add_argument('-r', '--retry', action='store_true', help='retry failed urls')
     scan_parser.add_argument('--ports-http', dest='ports_http', default=DEFAULT_HTTP_PORTS,

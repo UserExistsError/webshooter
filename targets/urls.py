@@ -1,10 +1,10 @@
 import logging
 import urllib.parse
-from collections.abc import Collection
+from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
-def process_urls(urls_raw: Collection[str]) -> set[str]:
+def process_urls(urls_raw: Iterator[str]) -> set[str]:
     '''
     Make sure every URL has a valid scheme. Drop any URLs that cannot be made valid.
     '''
@@ -15,6 +15,8 @@ def process_urls(urls_raw: Collection[str]) -> set[str]:
             if not urllib.parse.urlparse('https://'+u).netloc:
                 logger.error('invalid URL host: %s', u)
             else:
+                if not r.path:
+                    u += '/'
                 urls.add('http://'+u)
                 urls.add('https://'+u)
         elif not r.netloc:
@@ -22,17 +24,16 @@ def process_urls(urls_raw: Collection[str]) -> set[str]:
         elif r.scheme not in {'http', 'https'}:
             logger.error('invalid URL scheme: %s', u)
         else:
+            if not r.path:
+                u += '/'
             urls.add(u)
     return urls
 
 def from_file(text_file: str) -> set[str]:
-    urls = set()
     with open(text_file) as fp:
-        for u in fp:
-            urls.add(u.strip())
-    return process_urls(urls)
+        return from_iterator(fp)
 
-def from_collection(urls_raw: Collection[str]) -> set[str]:
+def from_iterator(urls_raw: Iterator[str]) -> set[str]:
     urls = set()
     for u in urls_raw:
         urls.add(u.strip())
