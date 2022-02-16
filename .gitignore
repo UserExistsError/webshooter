@@ -98,3 +98,4 @@ script.*.js
 page.*.html
 index.html
 tmp/
+.vscode/

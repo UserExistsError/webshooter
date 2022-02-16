@@ -30,6 +30,8 @@ RUN npm install
 
 # copy the app
 ADD --chown=$USER:$USER . ./
+RUN source .webshooter/bin/activate && \
+    pip install .
 
 # can run "python3 -m http.server" to browse html report at "http://localhost:8000/page.0.html"
 # docker run -p 127.0.0.1:8000:8000/tcp -it IMAGE
