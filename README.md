@@ -50,11 +50,11 @@ Browse to http://localhost:8000/page.0.html from your host to access the report.
 ```
 webshooter.py --session myscreens scan [-u URL_FILE] [-x NMAP_XML] [URL [... URL]]
 ```
-This will grab screenshots of all supplied urls. The session file can be used to resume a scan and generate a report. This command can be run multiple times with new urls to add. Once a url is added, it will be remembered in the session file. A screenshot will be attempted once for each url. Failed screenshots can be reattempted with --retry.
+This will grab screenshots of all supplied urls. The session file can be used to resume a scan and generate a report. This command can be run multiple times with new urls to add. Once a url is added, it will be remembered in the session file. A screenshot will be attempted once for each url. Failed screenshots can be reattempted with `--retry`.
 
-You can also provide a file with 1 url per line and pass it in with -u. Positional arguments are also treated as urls. In addition to urls, you can specify HOST[:PORT]. If the port is not specified in the url, it is inferred from the scheme. If no scheme or port is given, http/80 and https/443 are both attempted.
+You can also provide a file with 1 url per line and pass it in with `-u`. Positional arguments are also treated as urls. In addition to urls, you can specify HOST[:PORT]. If the port is not specified in the url, it is inferred from the scheme. If no scheme or port is given, http/80 and https/443 are both attempted.
 
-An nmap xml file can also be used with -x. Open ports that are considered HTTP (80,8080) or HTTPS (443,8443) will be scanned. You can override these ports with --ports-http and --ports-https. --all-open will treat all open ports as http/s and overrides --ports-http and --ports-https. Note that --ports-http[s] only applies to nmap xml.
+An nmap xml file can also be used with `-x`. Open ports that are considered HTTP (80,8080) or HTTPS (443,8443) will be scanned. You can override these ports with `--ports-http` and `--ports-https`. `--all-open` will treat all open ports as http/s and overrides `--ports-http` and `--ports-https`. Note that `--ports-http[s]` only applies to nmap xml.
 
 Recommended usage is to provide an nmap xml file generated like so:
 ```
@@ -67,4 +67,4 @@ Additional HTTP ports can be added.
 ```
 webshooter.py --session myscreens report
 ```
-The default report generates a tile view which doesn't require vertical scrolling. Use --column to get a less dense report with 1 screenshot per row. Screens per page can be set with the -p option. Navigate pages using the navigation bar or by using the left and right arrow keys. Screenshots are sorted by page title (or Server header if no title). The file index.html is generated with the report that links to the first instance of each unique page title.
+The default report generates a tile view which doesn't require vertical scrolling. Use `--column` to get a less dense report with 1 screenshot per row. Screens per page can be set with the `-p` option. Navigate pages using the navigation bar or by using the left and right arrow keys. Screenshots are sorted by page title (or Server header if no title). The file `index.html` is generated with the report that links to the first instance of each unique page title.
