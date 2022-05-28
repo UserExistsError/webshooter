@@ -4,17 +4,37 @@ const devices = puppeteer.devices;
 const express = require('express');
 const app = express();
 const crypto = require('crypto');
-const port = {{ port }};
-const csrfToken = Buffer.from('{{ token }}');
 
 const viewPortDims = {width: 1600, height: 900};
 
+if (typeof process.env.WEBSHOOTER_PORT === 'undefined') {
+    throw new Error('environment variable WEBSHOOTER_PORT is required');
+}
+const port = Number(process.env.WEBSHOOTER_PORT);
+
+if (typeof process.env.WEBSHOOTER_TOKEN === 'undefined') {
+    throw new Error('environment variable WEBSHOOTER_TOKEN is required');
+}
+const csrfToken = Buffer.from(process.env.WEBSHOOTER_TOKEN);
+
+// see https://chromium.googlesource.com/chromium/src/+/refs/heads/main/net/base/port_util.cc#27
+const restrictedPorts = [
+    1,    7,    9,   11,   13,   15,   17,    19,   20,
+   21,   22,   23,   25,   37,   42,   43,    53,   69,
+   77,   79,   87,   95,  101,  102,  103,   104,  109,
+  110,  111,  113,  115,  117,  119,  123,   135,  137,
+  139,  143,  161,  179,  389,  427,  465,   512,  513,
+  514,  515,  526,  530,  531,  532,  540,   548,  554,
+  556,  563,  587,  601,  636,  989,  990,   993,  995,
+ 1719, 1720, 1723, 2049, 3659, 4045, 5060,  5061, 6000,
+ 6566, 6665, 6666, 6667, 6668, 6669, 6697, 10080
+];
+
 // Add CSRF middleware
 app.use((req, res, next) => {
-    //console.log('Request to', req.url, 'from', req.ip);
     const tok = req.headers.token;
-    if (tok != undefined) {
-        if (tok.length == csrfToken.length) {
+    if (typeof tok !== 'undefined') {
+        if (tok.length === csrfToken.length) {
             if (crypto.timingSafeEqual(Buffer.from(tok), csrfToken)) {
                 next();
                 return;
@@ -38,16 +58,29 @@ Capture Request
 }
 */
 app.post('/capture', async (req, res) => {
-    //console.log(req.body);
-    const browser = await getBrowser();
-    const context = await browser.createIncognitoBrowserContext();
+    const context = await getBrowserContext();
+    //const context = await getBrowser().then(b => b.defaultBrowserContext());
+    const page = await context.newPage();
+    const startTime = Date.now();
     try {
-        let page_info = await capture(context, req.body);
+        const page_info = await capture(page, req.body);
         res.json(page_info);
     } catch (err) {
-        res.status(500).json({error: err});
+        res.status(500).json({
+            error: {
+                name: err.name,
+                message: err.message,
+                elapsed: Date.now() - startTime
+            }
+        });
     }
-    await context.close();
+    // wait for page to close to ensure we limit open windows. this should only matter for
+    // the default browser context since in that case, we can't close the context like we
+    // do for incognito mode.
+    await page.close();
+    if (context.isIncognito()) {
+        context.close().catch(() => {/* browser was probably closed */});
+    }
 });
 
 app.post('/shutdown', async (req, res) => {
@@ -70,7 +103,12 @@ app.post('/status', async (req, res) => {
             viewPortMobile: devices['iPhone X']['viewport']
         });
     }).catch(err => {
-        res.status(500).json({error: err})
+        res.status(500).json({
+            error: {
+                name: err.name,
+                message: err.message
+            }
+        });
     })
 });
 
@@ -78,24 +116,51 @@ const server = app.listen(port, '127.0.0.1', () => {
     console.log('Started capture service on', port);
 });
 
+async function getBrowserContext() {
+    // Must call close() on returned context when finished
+    const config = {};
+    if (typeof process.env.WEBSHOOTER_PROXY !== 'undefined') {
+        config.proxyServer = process.env.WEBSHOOTER_PROXY;
+    }
+    const browser = await getBrowser();
+    const context = await browser.createIncognitoBrowserContext(config);
+    return context;
+}
+
 var getBrowser = function() {
     let browser = undefined;
-    let cliArgs = [];
+    const launchArgs = {
+        args: [],
+        headless: true,
+        userDataDir: undefined,
+        ignoreHTTPSErrors: true,
+        defaultViewport: {
+            width: viewPortDims.width,
+            height: viewPortDims.height
+        }
+    };
     if (process.env.WEBSHOOTER_DOCKER === 'yes') {
         // This was necessary even after following the docs
         // https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-in-docker
-        cliArgs.push('--no-sandbox');
+        launchArgs.args.push('--no-sandbox');
     }
+    if (typeof process.env.WEBSHOOTER_PROXY !== 'undefined') {
+        // this probably isn't necessary since we specify the proxy for each new window that is opened
+        launchArgs.args.push(`--proxy-server=${process.env.WEBSHOOTER_PROXY}`);
+    }
+    if (typeof process.env.WEBSHOOTER_TEMP !== 'undefined') {
+        // this prevents loading the user's chromium settings including plugins
+        //cliArgs.push(`--user-data-dir=${process.env.WEBSHOOTER_TEMP}`);
+        launchArgs.userDataDir = process.env.WEBSHOOTER_TEMP;
+    }
+    if (typeof process.env.DISPLAY !== 'undefined') {
+        launchArgs.headless = false;
+    }
+    // allow unsafe ports. this may not work with --headless option
+    launchArgs.args.push('--explicitly-allowed-ports='+restrictedPorts.join(','));
     return (async function() {
-        if (browser == undefined) {
-            browser = await puppeteer.launch({
-                args: cliArgs,
-                ignoreHTTPSErrors: true,
-                defaultViewport: {
-                    width: viewPortDims.width,
-                    height: viewPortDims.height
-                }
-            });
+        if (typeof browser === 'undefined') {
+            browser = await puppeteer.launch(launchArgs);
         }
         return browser;
     });
@@ -116,9 +181,7 @@ function sleep(millisec) {
     return new Promise(resolve => setTimeout(resolve, millisec));
 }
 
-async function capture(context, opts) {
-    const page = await context.newPage();
-
+async function capture(page, opts) {
     // dismiss dialogs. these can hang the screenshot
     page.on('dialog', async dialog => {
         await dialog.dismiss();
@@ -132,29 +195,18 @@ async function capture(context, opts) {
         const userAgent = await getUserAgent();
         await page.setUserAgent(userAgent);
     }
-    var success = false;
-    const waitEvents = ['load', 'domcontentloaded', 'networkidle2'];
-    var response = null;
-    for (i = 0; i < waitEvents.length; i++) {
-        try {
-            response = await page.goto(opts.url, {
-                waitUntil: waitEvents[i],
-                timeout: opts.timeout_ms
-            });
-            success = true;
-            break;
-        } catch (e) {
-            // likely a timeout
-        }
-    }
 
-    if (!success) {
-        throw 'failed to navigate to URL';
-    }
+    // If this times out it will throw an exception
+    const response = await page.goto(opts.url, {
+        // See https://puppeteer.github.io/puppeteer/docs/puppeteer.page.goto#remarks
+        waitUntil: ['load'],
+        timeout: opts.timeout_ms
+    });
+
     // give page time to render
-    let page_info = {
+    const page_info = {
         url_final: page.url(),
-        title: await page.title().catch(function(r) { return '' }),
+        title: await page.title().catch((r) => { return '' }),
         headers: response.headers(),
         status: response.status(),
         security: response.securityDetails(),

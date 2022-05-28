@@ -59,7 +59,7 @@ def handle_scan(args):
     if len(urls) == 0:
         return
 
-    with screen.capture.CaptureService(args.node_path) as client:
+    with screen.capture.CaptureService(args.node_path, args.proxy, not args.show_browser) as client:
         client.configure(args.mobile, args.screen_wait_ms, args.page_wait_ms)
         screen.shoot.capture_from_urls(urls, args.threads, session, client)
 
@@ -100,6 +100,8 @@ def run():
     scan_parser.add_argument('--all-open', dest='all_open', action='store_true', help='scan all open ports')
     scan_parser.add_argument('urls', default=[], nargs='*', help='urls including scheme')
     scan_parser.add_argument('--dryrun', action='store_true', help='list URLs to scan')
+    scan_parser.add_argument('--proxy', help='proxy for headless browser. e.g. "socks://127.0.0.1:8080"')
+    scan_parser.add_argument('--show-browser', dest='show_browser', action='store_true', help='display the browser (*nix only)')
 
     # report
     report_parser = subparsers.add_parser('report', help='Generate report')

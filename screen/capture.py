@@ -4,6 +4,7 @@ import time
 import math
 import base64
 import logging
+import tempfile
 import subprocess
 import urllib.error
 import urllib.request
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 class CaptureError(Exception):
     def __init__(self, message):
+        if isinstance(message, dict):
+            message = message.get('message', str(message))
         super().__init__(message)
 
 class CaptureRequest(TypedDict):
@@ -40,7 +43,11 @@ class CaptureResponse(TypedDict):
     security: dict[Any, Any]
 
 class CaptureService():
-    def __init__(self, node_path: str):
+    '''
+    Optional `proxy` argument should be scheme://host:port as expected by Chromium's
+    --proxy-server option.
+    '''
+    def __init__(self, node_path: str, proxy: str=None, headless: bool=True):
         self.node_path = node_path
         self.proc = None
         self.script = None
@@ -49,14 +56,41 @@ class CaptureService():
         self.endpoint = f'http://{self.host}:{self.port}'
         self.token = hexlify(os.urandom(16)).decode('ascii')
         self.client = CaptureClient(self.token, self.endpoint)
+        self.proxy = proxy
+        self.headless = headless
+        self.temp_dir = None
     def __enter__(self) -> 'CaptureClient':
+        self.temp_dir = tempfile.TemporaryDirectory(prefix='webshooter-')
+        logger.debug('using temp dir %s', self.temp_dir.name)
         self.start()
         return self.client
     def __exit__(self, type, value, traceback):
         self.shutdown()
+        if self.temp_dir:
+            try:
+                self.temp_dir.cleanup()
+            except Error as err:
+                logger.error('Failed to cleanup temp dir: %s', str(err))
     def start(self):
-        self.script = js.script.build(self.token, self.port)
-        self.proc = js.script.run_background(self.script, self.node_path)
+        env = {
+            # This sets the Chromium user data directory
+            # see https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md
+            'WEBSHOOTER_TEMP': self.temp_dir.name,
+            'WEBSHOOTER_PORT': str(self.port),
+            'WEBSHOOTER_TOKEN': self.token
+        }
+        if self.proxy:
+            env['WEBSHOOTER_PROXY'] = self.proxy
+        if 'NODE_PATH' in os.environ:
+            env['NODE_PATH'] = os.environ['NODE_PATH']
+        if not self.headless:
+            # on linux you can set DISPLAY and run the browser with headless=false to see everything
+            if 'DISPLAY' not in os.environ:
+                logger.error('cannot display browser: no DISPLAY env var')
+            else:
+                env['DISPLAY'] = os.environ['DISPLAY']
+
+        self.proc = js.script.run_background(self.node_path, env)
         logger.info('Warming up the headless browser...')
         max_attempts = 10
         for attempt in range(max_attempts):
@@ -79,14 +113,11 @@ class CaptureService():
             logger.debug('Forcibly terminating the capture service')
             self.proc.terminate()
         self.proc = None
-        try:
-            os.unlink(self.script)
-        except FileNotFoundError:
-            pass
 
 class CaptureClient():
     DEFAULT_RENDER_WAIT_MS = 3000
     DEFAULT_PAGE_LOAD_TIMEOUT_MS = 10000
+    GRACE_PERIOD_TIMEOUT_MS = 5000
     def __init__(self, token: str, endpoint: str):
         self.endpoint = endpoint
         self.token = token
@@ -103,7 +134,7 @@ class CaptureClient():
         ''' how long to wait for capture service to respond. should always be greater than
             combined page load and render wait times
         '''
-        return math.ceil( (self.page_load_timeout_ms + self.render_wait_ms) / 1000 )
+        return math.ceil( (self.page_load_timeout_ms + self.render_wait_ms + self.GRACE_PERIOD_TIMEOUT_MS) / 1000 )
     def _headers(self) -> str:
         return {'token': self.token, 'content-type': 'application/json'}
     def capture(self, url: str, headers: dict[str, str]) -> CaptureResponse:
@@ -125,9 +156,9 @@ class CaptureClient():
                     else:
                         return page_info
                 else:
-                    err = str(json.load(resp)['error'])
+                    err = json.load(resp)['error']
         except urllib.error.HTTPError as e:
-            err = str(json.load(e)['error'])
+            err = json.load(e)['error']
         except Exception as e:
             err = str(e)
         raise CaptureError(err)
