@@ -1,8 +1,8 @@
 import os
+import sys
 import json
 import time
 import math
-import base64
 import logging
 import tempfile
 import subprocess
@@ -11,7 +11,6 @@ import urllib.request
 from binascii import hexlify
 from typing import Any, TypedDict
 
-import js.script
 from screen.session import Status, WebShooterSession
 
 logger = logging.getLogger(__name__)
@@ -47,6 +46,7 @@ class CaptureService():
     Optional `proxy` argument should be scheme://host:port as expected by Chromium's
     --proxy-server option.
     '''
+    CAPTURE_SERVICE_FILE=os.path.join(os.path.dirname(__file__), 'capture_service.js')
     def __init__(self, node_path: str, proxy: str=None, headless: bool=True):
         self.node_path = node_path
         self.proc = None
@@ -90,7 +90,13 @@ class CaptureService():
             else:
                 env['DISPLAY'] = os.environ['DISPLAY']
 
-        self.proc = js.script.run_background(self.node_path, env)
+        cmd = [self.node_path, self.CAPTURE_SERVICE_FILE]
+        try:
+            self.proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT, env=env)
+        except Exception as e:
+            logger.error('Failed to call node: '+str(e))
+            raise e
+
         logger.info('Warming up the headless browser...')
         max_attempts = 10
         for attempt in range(max_attempts):
