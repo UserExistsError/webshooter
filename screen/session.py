@@ -50,7 +50,7 @@ class WebShooterSession():
             VALUES (?, ?, ?, ?, ?, ?, ?)''',
                          (screen['url'], screen['url_final'], screen['title'], screen['server'],
                           screen['headers'], screen['status'], screen['image']))
-            conn.execute('UPDATE urls SET status=1 WHERE url=?', (screen['url'],))
+            conn.execute('UPDATE urls SET status = ? WHERE url = ?', (Status.FINISHED, screen['url']))
     def url_screen_exists(self, url_final: str):
         conn = self._get_conn()
         with conn:
