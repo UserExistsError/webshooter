@@ -5,6 +5,11 @@ const express = require('express');
 const app = express();
 const crypto = require('crypto');
 
+const homedir = require('os').homedir();
+const pathjoin = require('path').join;
+const defaultProjectRoot = pathjoin(homedir, '.webshooter', 'puppeteer');
+const fs = require('fs');
+
 const viewPortDims = {width: 1600, height: 900};
 
 if (typeof process.env.WEBSHOOTER_PORT === 'undefined') {
@@ -94,6 +99,12 @@ app.post('/shutdown', async (req, res) => {
     });
 });
 
+// Track browser download progress. For bundled JavaScript, the browser is not
+// included and must be downloaded during the first run.
+const browserDownloadStatus = {
+    progress: 0, // takes a value in [0,1] computed as bytes_downloaded / total_bytes
+};
+
 app.post('/status', async (req, res) => {
     getUserAgent().then(userAgent => {
         res.json({
@@ -107,7 +118,8 @@ app.post('/status', async (req, res) => {
             error: {
                 name: err.name,
                 message: err.message
-            }
+            },
+            browserDownloadProgress: browserDownloadStatus.progress
         });
     })
 });
@@ -127,7 +139,33 @@ async function getBrowserContext() {
     return context;
 }
 
-var getBrowser = function() {
+// Checks if a browser is installed. If not, downloads one. Updates download
+// progress and returns on download completion.
+async function ensureBrowserInstall() {
+    if (typeof puppeteer._projectRoot === 'undefined') {
+        console.log('No projectRoot defined. Using', defaultProjectRoot);
+        if (!fs.existsSync(defaultProjectRoot)) {
+            console.log('Creating projectRoot at', defaultProjectRoot);
+            fs.mkdirSync(defaultProjectRoot, { recursive: true });
+        }
+        puppeteer._projectRoot = defaultProjectRoot;
+    }
+    const fetcher = puppeteer.createBrowserFetcher();
+    const revisions = await fetcher.localRevisions();
+    revisions.forEach(rev => console.log('Local revision:', rev));
+    if (revisions.length === 0) {
+        console.log('No local Chromium available. Downloading one.');
+        // see https://github.com/puppeteer/puppeteer/blob/main/src/revisions.ts
+        const revision = await fetcher.download(puppeteer._preferredRevision, (have, need) => {
+            browserDownloadStatus.progress = have / need;
+        });
+        console.log('Downloaded new browser revision:', revision);
+    }
+    browserDownloadStatus.progress = 1;
+}
+
+const getBrowser = function() {
+    ensureBrowserInstall();
     let browser = undefined;
     const launchArgs = {
         args: [],
@@ -166,10 +204,10 @@ var getBrowser = function() {
     });
 }();
 
-var getUserAgent = function() {
+const getUserAgent = function() {
     let userAgent = undefined;
     return (async function() {
-        if (userAgent == undefined) {
+        if (typeof userAgent === 'undefined') {
             const userAgentHeadless = await getBrowser().then(browser => browser.userAgent());
             userAgent = userAgentHeadless.replace('Headless', '');
         }
@@ -196,14 +234,22 @@ async function capture(page, opts) {
         await page.setUserAgent(userAgent);
     }
 
-    // If this times out it will throw an exception
     const response = await page.goto(opts.url, {
         // See https://puppeteer.github.io/puppeteer/docs/puppeteer.page.goto#remarks
         waitUntil: ['load'],
         timeout: opts.timeout_ms
-    });
+    }).
+        catch(err => {
+            if (err.name === 'TimeoutError') {
+                console.log('Timeout waiting for `load` event. Trying again with `domcontentloaded`.');
+                return page.goto(opts.url, {
+                    waitUntil: ['domcontentloaded'],
+                    timeout: opts.timeout_ms
+                });
+            }
+            throw err;
+        });
 
-    // give page time to render
     const page_info = {
         url_final: page.url(),
         title: await page.title().catch((r) => { return '' }),
@@ -212,15 +258,10 @@ async function capture(page, opts) {
         security: response.securityDetails(),
         image: ''
     };
+    // give page time to render
     await sleep(opts.render_wait_ms);
     page_info.image = await page.screenshot({
         encoding: 'base64',
-        clip: {
-            x: 0,
-            y: 0,
-            width: page.viewport().width,
-            height: page.viewport().height
-        }
     });
     return page_info;
 }

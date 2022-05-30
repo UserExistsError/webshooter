@@ -21,11 +21,6 @@ def split_ports(ports: str) -> set[int]:
     return set(map(int, ports.split(',')))
 
 def handle_scan(args):
-    # verify node exists
-    if shutil.which(args.node_path) is None:
-        print('Failed to find node executable')
-        sys.exit(1)
-
     # get urls to screenshot
     if args.all_open:
         args.ports_http = set(range(2**16))
@@ -87,7 +82,7 @@ def run():
     scan_parser.set_defaults(handle=handle_scan)
     scan_parser.add_argument('-x', '--nmap-xml', action='append', default=[], dest='nmap_xml', help='nmap xml')
     scan_parser.add_argument('-u', '--url-file', action='append', default=[], dest='url_file', help='urls 1 per line. include scheme')
-    scan_parser.add_argument('-n', '--node-path', dest='node_path', default='node', help='nodejs path')
+    scan_parser.add_argument('-n', '--node-path', dest='node_path', default=None, help='nodejs path')
     scan_parser.add_argument('-w', '--threads', default=5, type=int, help='number of concurrent screenshots to take. default 5')
     scan_parser.add_argument('-t', '--page-timeout', dest='page_wait_ms', default=5000, type=int, help='timeout in millisecs for page load event')
     scan_parser.add_argument('-l', '--screen-wait', dest='screen_wait_ms', default=2000, type=int, help='wait in millisecs between page load and screenshot')

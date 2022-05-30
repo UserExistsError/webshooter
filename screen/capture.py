@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import math
+import shutil
 import logging
 import tempfile
 import subprocess
@@ -20,6 +21,11 @@ class CaptureError(Exception):
         if isinstance(message, dict):
             message = message.get('message', str(message))
         super().__init__(message)
+
+class BrowserDownloadInProgressError(CaptureError):
+    def __init__(self, resp: dict):
+        self.progress = resp['browserDownloadProgress']
+        super().__init__(resp['error'])
 
 class CaptureRequest(TypedDict):
     url: str
@@ -47,10 +53,28 @@ class CaptureService():
     --proxy-server option.
     '''
     CAPTURE_SERVICE_FILE=os.path.join(os.path.dirname(__file__), 'capture_service.js')
-    def __init__(self, node_path: str, proxy: str=None, headless: bool=True):
-        self.node_path = node_path
+    CAPTURE_SERVICE_BUNDLE_FILE=os.path.join(os.path.dirname(__file__), 'capture_service_bundle.js')
+    PKG_NODE_ROOT_PATH=os.path.join(os.path.dirname(__file__), 'nodejs')
+    PKG_NODE_MODULE_PATH=os.path.join(os.path.dirname(__file__), 'node_modules')
+    def __init__(self, node_bin_path: str, proxy: str=None, headless: bool=True):
+        if not node_bin_path:
+            if os.path.isdir(self.PKG_NODE_ROOT_PATH):
+                windows_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'node')
+                nix_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'bin/node')
+                if os.path.exists(windows_path):
+                    node_bin_path = windows_path
+                elif os.path.exists(nix_path):
+                    node_bin_path = nix_path
+        if not node_bin_path:
+            node_bin_path = 'node'
+        node_bin_path = shutil.which(node_bin_path)
+        if not node_bin_path:
+            raise RuntimeError('Failed to find node executable')
+        logger.debug('Using `node` path %s', node_bin_path)
+        self.node_bin_path = node_bin_path
+        self.node_mod_path = self.PKG_NODE_MODULE_PATH if os.path.exists(self.PKG_NODE_MODULE_PATH) else os.environ.get('NODE_PATH', None)
+        self.script = self.CAPTURE_SERVICE_BUNDLE_FILE if os.path.exists(self.CAPTURE_SERVICE_BUNDLE_FILE) else self.CAPTURE_SERVICE_FILE
         self.proc = None
-        self.script = None
         self.host = '127.0.0.1'
         self.port = 3000
         self.endpoint = f'http://{self.host}:{self.port}'
@@ -81,8 +105,8 @@ class CaptureService():
         }
         if self.proxy:
             env['WEBSHOOTER_PROXY'] = self.proxy
-        if 'NODE_PATH' in os.environ:
-            env['NODE_PATH'] = os.environ['NODE_PATH']
+        if self.node_mod_path:
+            env['NODE_PATH'] = self.node_mod_path
         if not self.headless:
             # on linux you can set DISPLAY and run the browser with headless=false to see everything
             if 'DISPLAY' not in os.environ:
@@ -90,7 +114,8 @@ class CaptureService():
             else:
                 env['DISPLAY'] = os.environ['DISPLAY']
 
-        cmd = [self.node_path, self.CAPTURE_SERVICE_FILE]
+        cmd = [self.node_bin_path, self.script]
+        logger.debug('launching capture service: %s', cmd)
         try:
             self.proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT, env=env)
         except Exception as e:
@@ -98,15 +123,18 @@ class CaptureService():
             raise e
 
         logger.info('Warming up the headless browser...')
-        max_attempts = 10
-        for attempt in range(max_attempts):
+        attempts_left = 10
+        while attempts_left > 0:
             try:
                 self.client.status()
                 return True
+            except BrowserDownloadInProgressError as e:
+                logger.info('Waiting for browser download. Progress: %.02f%%', e.progress * 100)
             except Exception as e:
+                attempts_left -= 1
                 if 'connection refused' not in str(e).lower():
                     logger.error('Failed to check status of capture service: '+str(e))
-                time.sleep(1)
+            time.sleep(1)
         self.shutdown()
         raise CaptureError('Failed to start capture service')
     def shutdown(self):
@@ -176,4 +204,11 @@ class CaptureClient():
             logger.error('Failed to gracefully terminate capture service')
     def status(self) -> dict[str, Any]:
         req = urllib.request.Request(self.endpoint + '/status', headers=self._headers(), method='POST')
-        return json.load(urllib.request.urlopen(req, timeout=self._service_timeout()))
+        try:
+            return json.load(urllib.request.urlopen(req, timeout=self._service_timeout()))
+        except urllib.error.HTTPError as e:
+            resp = json.load(e)
+            err = resp['error']
+            if 'Could not find expected browser ' in err['message'] and resp['browserDownloadProgress'] < 1:
+                raise BrowserDownloadInProgressError(resp)
+        raise CaptureError(err)
