@@ -5,11 +5,6 @@ const express = require('express');
 const app = express();
 const crypto = require('crypto');
 
-const homedir = require('os').homedir();
-const pathjoin = require('path').join;
-const defaultProjectRoot = pathjoin(homedir, '.webshooter', 'puppeteer');
-const fs = require('fs');
-
 const viewPortDims = {width: 1600, height: 900};
 
 if (typeof process.env.WEBSHOOTER_PORT === 'undefined') {
@@ -99,12 +94,6 @@ app.post('/shutdown', async (req, res) => {
     });
 });
 
-// Track browser download progress. For bundled JavaScript, the browser is not
-// included and must be downloaded during the first run.
-const browserDownloadStatus = {
-    progress: 0, // takes a value in [0,1] computed as bytes_downloaded / total_bytes
-};
-
 app.post('/status', async (req, res) => {
     getUserAgent().then(userAgent => {
         res.json({
@@ -119,7 +108,6 @@ app.post('/status', async (req, res) => {
                 name: err.name,
                 message: err.message
             },
-            browserDownloadProgress: browserDownloadStatus.progress
         });
     })
 });
@@ -139,33 +127,7 @@ async function getBrowserContext() {
     return context;
 }
 
-// Checks if a browser is installed. If not, downloads one. Updates download
-// progress and returns on download completion.
-async function ensureBrowserInstall() {
-    if (typeof puppeteer._projectRoot === 'undefined') {
-        console.log('No projectRoot defined. Using', defaultProjectRoot);
-        if (!fs.existsSync(defaultProjectRoot)) {
-            console.log('Creating projectRoot at', defaultProjectRoot);
-            fs.mkdirSync(defaultProjectRoot, { recursive: true });
-        }
-        puppeteer._projectRoot = defaultProjectRoot;
-    }
-    const fetcher = puppeteer.createBrowserFetcher();
-    const revisions = await fetcher.localRevisions();
-    revisions.forEach(rev => console.log('Local revision:', rev));
-    if (revisions.length === 0) {
-        console.log('No local Chromium available. Downloading one.');
-        // see https://github.com/puppeteer/puppeteer/blob/main/src/revisions.ts
-        const revision = await fetcher.download(puppeteer._preferredRevision, (have, need) => {
-            browserDownloadStatus.progress = have / need;
-        });
-        console.log('Downloaded new browser revision:', revision);
-    }
-    browserDownloadStatus.progress = 1;
-}
-
 const getBrowser = function() {
-    ensureBrowserInstall();
     let browser = undefined;
     const launchArgs = {
         args: [],

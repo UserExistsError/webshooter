@@ -22,11 +22,6 @@ class CaptureError(Exception):
             message = message.get('message', str(message))
         super().__init__(message)
 
-class BrowserDownloadInProgressError(CaptureError):
-    def __init__(self, resp: dict):
-        self.progress = resp['browserDownloadProgress']
-        super().__init__(resp['error'])
-
 class CaptureRequest(TypedDict):
     url: str
     mobile: bool
@@ -53,27 +48,23 @@ class CaptureService():
     --proxy-server option.
     '''
     CAPTURE_SERVICE_FILE=os.path.join(os.path.dirname(__file__), 'capture_service.js')
-    CAPTURE_SERVICE_BUNDLE_FILE=os.path.join(os.path.dirname(__file__), 'capture_service_bundle.js')
     PKG_NODE_ROOT_PATH=os.path.join(os.path.dirname(__file__), 'nodejs')
-    PKG_NODE_MODULE_PATH=os.path.join(os.path.dirname(__file__), 'node_modules')
-    def __init__(self, node_bin_path: str, proxy: str=None, headless: bool=True):
-        if not node_bin_path:
+    def __init__(self, node_path: str, proxy: str=None, headless: bool=True):
+        if not node_path:
             if os.path.isdir(self.PKG_NODE_ROOT_PATH):
                 windows_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'node')
                 nix_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'bin/node')
                 if os.path.exists(windows_path):
-                    node_bin_path = windows_path
+                    node_path = windows_path
                 elif os.path.exists(nix_path):
-                    node_bin_path = nix_path
-        if not node_bin_path:
-            node_bin_path = 'node'
-        node_bin_path = shutil.which(node_bin_path)
-        if not node_bin_path:
+                    node_path = nix_path
+        if not node_path:
+            node_path = 'node'
+        node_path = shutil.which(node_path)
+        if not node_path:
             raise RuntimeError('Failed to find node executable')
-        logger.debug('Using `node` path %s', node_bin_path)
-        self.node_bin_path = node_bin_path
-        self.node_mod_path = self.PKG_NODE_MODULE_PATH if os.path.exists(self.PKG_NODE_MODULE_PATH) else os.environ.get('NODE_PATH', None)
-        self.script = self.CAPTURE_SERVICE_BUNDLE_FILE if os.path.exists(self.CAPTURE_SERVICE_BUNDLE_FILE) else self.CAPTURE_SERVICE_FILE
+        logger.debug('Using `node` path %s', node_path)
+        self.node_path = node_path
         self.proc = None
         self.host = '127.0.0.1'
         self.port = 3000
@@ -105,8 +96,6 @@ class CaptureService():
         }
         if self.proxy:
             env['WEBSHOOTER_PROXY'] = self.proxy
-        if self.node_mod_path:
-            env['NODE_PATH'] = self.node_mod_path
         if not self.headless:
             # on linux you can set DISPLAY and run the browser with headless=false to see everything
             if 'DISPLAY' not in os.environ:
@@ -114,7 +103,7 @@ class CaptureService():
             else:
                 env['DISPLAY'] = os.environ['DISPLAY']
 
-        cmd = [self.node_bin_path, self.script]
+        cmd = [self.node_path, self.CAPTURE_SERVICE_FILE]
         logger.debug('launching capture service: %s', cmd)
         try:
             self.proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT, env=env)
@@ -128,8 +117,6 @@ class CaptureService():
             try:
                 self.client.status()
                 return True
-            except BrowserDownloadInProgressError as e:
-                logger.info('Waiting for browser download. Progress: %.02f%%', e.progress * 100)
             except Exception as e:
                 attempts_left -= 1
                 if 'connection refused' not in str(e).lower():
@@ -207,8 +194,5 @@ class CaptureClient():
         try:
             return json.load(urllib.request.urlopen(req, timeout=self._service_timeout()))
         except urllib.error.HTTPError as e:
-            resp = json.load(e)
-            err = resp['error']
-            if 'Could not find expected browser ' in err['message'] and resp['browserDownloadProgress'] < 1:
-                raise BrowserDownloadInProgressError(resp)
+            err = json.load(e)['error']
         raise CaptureError(err)
