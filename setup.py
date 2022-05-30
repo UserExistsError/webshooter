@@ -20,11 +20,15 @@ def install_node():
             'darwin-x86_64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-darwin-x64.tar.gz',
             'darwin-arm64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-darwin-arm64.tar.gz'
         }
-        target = platform.system().lower() + '-' + platform.machine()
+        target = (platform.system() + '-' + platform.machine()).lower()
         if target not in node_links:
             raise RuntimeError(f'Unrecognized platform {target}. Install node and npm, then re-run this installer.')
         return node_links[target]
     npm_env = {}
+    for v in os.environ:
+        # e.g. PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        if v.startswith('PUPPETEER_'):
+            npm_env[v] = os.environ[v]
     if not shutil.which('npm'):
         from urllib.request import urlopen
         from zipfile import ZipFile

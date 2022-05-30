@@ -6,6 +6,17 @@ Take screenshots of web sites and generate an HTML report. This tool waits a spe
 
 ## Installation
 
+### pip
+
+You can install with `pip` after cloning the repository:
+
+```
+pip install .
+```
+
+This will check for a nodejs install and install binaries from https://nodejs.org/ if needed. Nodejs and all dependencies will
+be installed in the `site-packages` directory, and will be removed when you uninstall webshooter.
+
 ### Manual Install
 
 Requires python3.9+, nodejs, and npm. Puppeteer is used for rendering pages and taking screenshots. Jinja2 is used for html and JavaScript templating.

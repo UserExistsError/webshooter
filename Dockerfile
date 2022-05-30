@@ -22,15 +22,14 @@ RUN addgroup -S -g $GID $USER && \
     adduser -S -G $USER -h /web -D -u $UID $USER
 USER $USER
 
-# install python and node dependencies
-ADD --chown=$USER:$USER requirements.txt package.json ./
+# install python dependencies in a virtualenv
+ADD --chown=$USER:$USER requirements.txt ./
 RUN python -m venv .webshooter && \
     source .webshooter/bin/activate && \
     pip install --no-cache-dir -r requirements.txt && \
     echo "source .webshooter/bin/activate" > .profile
-RUN npm install
 
-# copy the app
+# copy the app and install
 ADD --chown=$USER:$USER . ./
 RUN source .webshooter/bin/activate && \
     pip install .

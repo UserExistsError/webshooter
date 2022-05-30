@@ -95,7 +95,6 @@ package-lock.json
 *.png
 *.bak
 script.*.js
-*_bundle.js
 page.*.html
 index.html
 tmp/

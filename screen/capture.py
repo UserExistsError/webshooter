@@ -92,7 +92,8 @@ class CaptureService():
             # see https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md
             'WEBSHOOTER_TEMP': self.temp_dir.name,
             'WEBSHOOTER_PORT': str(self.port),
-            'WEBSHOOTER_TOKEN': self.token
+            'WEBSHOOTER_TOKEN': self.token,
+            'WEBSHOOTER_DOCKER': os.environ.get('WEBSHOOTER_DOCKER', 'no')
         }
         if self.proxy:
             env['WEBSHOOTER_PROXY'] = self.proxy
@@ -102,8 +103,12 @@ class CaptureService():
                 logger.error('cannot display browser: no DISPLAY env var')
             else:
                 env['DISPLAY'] = os.environ['DISPLAY']
-
+        for v in os.environ:
+            if v.startswith('PUPPETEER_'):
+                # The Docker alpine image uses PUPPETEER_EXECUTABLE_PATH
+                env[v] = os.environ[v]
         cmd = [self.node_path, self.CAPTURE_SERVICE_FILE]
+        logger.debug('node environment: %s', env)
         logger.debug('launching capture service: %s', cmd)
         try:
             self.proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT, env=env)
