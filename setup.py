@@ -16,7 +16,7 @@ def install_node():
     def get_download_url(NODE_VERSION='v16.15.0'):
         node_links = {
             'linux-x86_64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-linux-x64.tar.xz',
-            'windows-x86_64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-win-x64.zip',
+            'windows-amd64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-win-x64.zip',
             'darwin-x86_64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-darwin-x64.tar.gz',
             'darwin-arm64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-darwin-arm64.tar.gz'
         }
@@ -24,12 +24,8 @@ def install_node():
         if target not in node_links:
             raise RuntimeError(f'Unrecognized platform {target}. Install node and npm, then re-run this installer.')
         return node_links[target]
-    npm_env = {}
-    for v in os.environ:
-        # e.g. PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        if v.startswith('PUPPETEER_'):
-            npm_env[v] = os.environ[v]
-    if not shutil.which('npm'):
+    npm_env = dict(os.environ)
+    if not shutil.which('npm', path=npm_env['PATH']):
         from urllib.request import urlopen
         from zipfile import ZipFile
         import platform, tarfile
@@ -59,14 +55,13 @@ def install_node():
         shutil.move(extract_dir, node_dir)
         sep = ';' if platform.system().lower() == 'windows' else ':'
         npm_env['PATH'] = os.path.abspath(bin_dir) + sep + os.environ['PATH']
-    else:
-        # NodeJS may already be installed
-        npm_env['PATH'] = os.environ['PATH']
 
     cwd = os.getcwd()
     os.chdir('screen')
     print('Running `npm install`')
-    result = subprocess.run(['npm', 'install'], capture_output=True, check=True, env=npm_env)
+    # see https://docs.python.org/3/library/subprocess.html#subprocess.Popen
+    npm_path = shutil.which('npm', path=npm_env['PATH'])
+    result = subprocess.run([npm_path, 'install'], capture_output=True, check=True, env=npm_env)
     print(result.stdout.decode())
     os.chdir(cwd)
 

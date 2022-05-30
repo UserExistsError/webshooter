@@ -52,7 +52,7 @@ class CaptureService():
     def __init__(self, node_path: str, proxy: str=None, headless: bool=True):
         if not node_path:
             if os.path.isdir(self.PKG_NODE_ROOT_PATH):
-                windows_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'node')
+                windows_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'node.exe')
                 nix_path = os.path.join(self.PKG_NODE_ROOT_PATH, 'bin/node')
                 if os.path.exists(windows_path):
                     node_path = windows_path
@@ -60,7 +60,7 @@ class CaptureService():
                     node_path = nix_path
         if not node_path:
             node_path = 'node'
-        node_path = shutil.which(node_path)
+        node_path = shutil.which(node_path, path=os.environ['PATH'])
         if not node_path:
             raise RuntimeError('Failed to find node executable')
         logger.debug('Using `node` path %s', node_path)
@@ -84,32 +84,33 @@ class CaptureService():
         if self.temp_dir:
             try:
                 self.temp_dir.cleanup()
-            except Error as err:
+            except Exception as err:
                 logger.error('Failed to cleanup temp dir: %s', str(err))
     def start(self):
-        env = {
+        # Node wouldn't work correctly on Windows without pulling in most of the environment
+        env = dict(os.environ)
+        env.update({
             # This sets the Chromium user data directory
             # see https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md
             'WEBSHOOTER_TEMP': self.temp_dir.name,
             'WEBSHOOTER_PORT': str(self.port),
             'WEBSHOOTER_TOKEN': self.token,
-            'WEBSHOOTER_DOCKER': os.environ.get('WEBSHOOTER_DOCKER', 'no')
-        }
+            'WEBSHOOTER_DOCKER': os.environ.get('WEBSHOOTER_DOCKER', 'no'),
+            'WEBSHOOTER_HEADLESS': 'yes' if self.headless else 'no'
+        })
         if self.proxy:
             env['WEBSHOOTER_PROXY'] = self.proxy
         if not self.headless:
             # on linux you can set DISPLAY and run the browser with headless=false to see everything
             if 'DISPLAY' not in os.environ:
                 logger.error('cannot display browser: no DISPLAY env var')
-            else:
-                env['DISPLAY'] = os.environ['DISPLAY']
-        for v in os.environ:
+        for v in env:
             if v.startswith('PUPPETEER_'):
                 # The Docker alpine image uses PUPPETEER_EXECUTABLE_PATH
-                env[v] = os.environ[v]
+                logger.debug('%s=%s', v, os.environ[v])
         cmd = [self.node_path, self.CAPTURE_SERVICE_FILE]
-        logger.debug('node environment: %s', env)
         logger.debug('launching capture service: %s', cmd)
+
         try:
             self.proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT, env=env)
         except Exception as e:

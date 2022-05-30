@@ -112,7 +112,7 @@ app.post('/status', async (req, res) => {
     })
 });
 
-const server = app.listen(port, '127.0.0.1', () => {
+var server = app.listen(port, '127.0.0.1', () => {
     console.log('Started capture service on', port);
 });
 
@@ -153,8 +153,8 @@ const getBrowser = function() {
         //cliArgs.push(`--user-data-dir=${process.env.WEBSHOOTER_TEMP}`);
         launchArgs.userDataDir = process.env.WEBSHOOTER_TEMP;
     }
-    if (typeof process.env.DISPLAY !== 'undefined') {
-        launchArgs.headless = false;
+    if (typeof process.env.WEBSHOOTER_HEADLESS !== 'undefined') {
+        launchArgs.headless = process.env.WEBSHOOTER_HEADLESS === 'yes';
     }
     // allow unsafe ports. this may not work with --headless option
     launchArgs.args.push('--explicitly-allowed-ports='+restrictedPorts.join(','));
