@@ -6,10 +6,10 @@ import tempfile
 import urllib.parse
 import concurrent.futures
 
-from screen.session import Status, WebShooterSession
-from screen.capture import CaptureClient, CaptureError
+from webshooter.screen.session import Status, WebShooterSession
+from webshooter.screen.capture import CaptureClient, CaptureError
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
 
 def image_name_from_url(url: str) -> str:
     u = urllib.parse.urlparse(url)

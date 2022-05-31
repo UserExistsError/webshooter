@@ -6,7 +6,7 @@ import threading
 import urllib.parse
 from typing import Any
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
 
 class Status:
     QUEUED=0

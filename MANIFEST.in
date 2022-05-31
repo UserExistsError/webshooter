@@ -1,3 +1,2 @@
-graft screen/node_modules
-graft screen/nodejs
-include screen/*.js screen/*.json
+recursive-include webshooter *
+recursive-exclude webshooter __pycache__

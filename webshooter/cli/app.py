@@ -4,15 +4,12 @@ import shutil
 import logging
 import argparse
 
-import targets.nmap
-import targets.urls
-import report.generate
-import screen.shoot
-import screen.session
-import screen.capture
-from report.template import Template
+from webshooter import targets
+from webshooter import report
+from webshooter import screen
+from webshooter.report.template import Template
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
 
 DEFAULT_HTTP_PORTS = {80, 8080}
 DEFAULT_HTTPS_PORTS = {443, 8443}
@@ -111,7 +108,8 @@ def run():
     if args.debug or args.verbose:
         h = logging.StreamHandler()
         h.setFormatter(logging.Formatter('[%(levelname)s] %(filename)s:%(lineno)s %(message)s'))
-        for n in [__name__, 'js', 'targets', 'report', 'screen']:
+        for p in ['cli', 'targets', 'report', 'screen']:
+            n = 'webshooter.' + p
             l = logging.getLogger(n)
             if args.debug:
                 l.setLevel(logging.DEBUG)

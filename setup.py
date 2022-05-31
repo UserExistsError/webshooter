@@ -34,7 +34,7 @@ def install_node():
         filename = os.path.basename(url)
         bin_dir = None
         extract_dir = None
-        node_dir = os.path.join('screen', 'nodejs')
+        node_dir = os.path.join('webshooter', 'screen', 'nodejs')
         if os.path.exists(node_dir):
             raise FileExistsError(f'Did not expect to find directory: {node_dir}')
         print('Downloading from', url)
@@ -57,12 +57,16 @@ def install_node():
         npm_env['PATH'] = os.path.abspath(bin_dir) + sep + os.environ['PATH']
 
     cwd = os.getcwd()
-    os.chdir('screen')
+    os.chdir(os.path.join('webshooter', 'screen'))
     print('Running `npm install`')
     # see https://docs.python.org/3/library/subprocess.html#subprocess.Popen
     npm_path = shutil.which('npm', path=npm_env['PATH'])
-    result = subprocess.run([npm_path, 'install'], capture_output=True, check=True, env=npm_env)
-    print(result.stdout.decode())
+    try:
+        result = subprocess.run([npm_path, 'install'], capture_output=True, check=True, env=npm_env)
+        print(result.stdout.decode())
+    except subprocess.CalledProcessError as e:
+        print('Error `npm install`:', e.stderr)
+        raise e
     os.chdir(cwd)
 
 setup(
@@ -76,11 +80,11 @@ setup(
     install_requires=[
         'Jinja2>=2,<4'
     ],
-    # include files under version control. files generated during install must be added to MANIFEST.in
+    # include non-python files. see also MANIFEST.in
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'webshooter=cli:run'
+            'webshooter=webshooter.cli:run'
         ]
     },
     cmdclass={

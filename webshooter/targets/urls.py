@@ -2,7 +2,7 @@ import logging
 import urllib.parse
 from collections.abc import Iterator
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
 
 def process_urls(urls_raw: Iterator[str]) -> set[str]:
     '''

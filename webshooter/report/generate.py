@@ -4,9 +4,9 @@ import shutil
 import logging
 from collections import deque
 
-import report.template
+from webshooter import report
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
 
 report_files = [
     os.path.join(os.path.dirname(__file__), 'web.js'),

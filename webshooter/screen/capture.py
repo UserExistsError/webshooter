@@ -12,9 +12,9 @@ import urllib.request
 from binascii import hexlify
 from typing import Any, TypedDict
 
-from screen.session import Status, WebShooterSession
+from webshooter.screen.session import Status, WebShooterSession
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
 
 class CaptureError(Exception):
     def __init__(self, message):
