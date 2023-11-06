@@ -13,7 +13,7 @@ class Install(default_install):
         default_install.run(self)
 
 def install_node():
-    def get_download_url(NODE_VERSION='v16.15.0'):
+    def get_download_url(NODE_VERSION='v20.9.0'):
         node_links = {
             'linux-x86_64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-linux-x64.tar.xz',
             'windows-amd64': f'https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-win-x64.zip',
