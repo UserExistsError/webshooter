@@ -1,2 +1,2 @@
-recursive-include webshooter *
+recursive-include webshooter/screen *
 recursive-exclude webshooter __pycache__

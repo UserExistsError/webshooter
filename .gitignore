@@ -91,6 +91,7 @@ ENV/
 # node
 node_modules/
 package-lock.json
+webshooter/screen/nodejs/
 
 *.png
 *.bak

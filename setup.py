@@ -1,7 +1,7 @@
 import shutil
 import os.path
 import subprocess
-from setuptools import setup, find_packages
+from setuptools import setup
 from setuptools.command.install import install as default_install
 
 
@@ -70,23 +70,6 @@ def install_node():
     os.chdir(cwd)
 
 setup(
-    name='webshooter',
-    version='0.1.0',
-    author='UserExistsError',
-    url='https://github.com/UserExistsError/webshooter',
-    description='Capture screenshots of web sites',
-    packages=find_packages(),
-    python_requires='>=3.9',
-    install_requires=[
-        'Jinja2>=2,<4'
-    ],
-    # include non-python files. see also MANIFEST.in
-    include_package_data=True,
-    entry_points={
-        'console_scripts': [
-            'webshooter=webshooter.cli:run'
-        ]
-    },
     cmdclass={
         'install': Install
     }
