@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = [
-    "Jinja2 >=2, <4"
+    "Jinja2 >=3.1, <4"
 ]
 
 [project.urls]
