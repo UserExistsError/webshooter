@@ -1,6 +1,3 @@
-import sys
-import json
-import shutil
 import logging
 import argparse
 
@@ -20,8 +17,8 @@ def split_ports(ports: str) -> set[int]:
 def handle_scan(args):
     # get urls to screenshot
     if args.all_open:
-        args.ports_http = set(range(2**16))
-        args.ports_https = set(range(2**16))
+        args.ports_http = set(range(1, 2**16))
+        args.ports_https = set(range(1, 2**16))
 
     urls = set()
     if args.urls:
@@ -30,6 +27,8 @@ def handle_scan(args):
         urls.update(targets.urls.from_file(ufile))
     for nxml in args.nmap_xml:
         urls.update(targets.nmap.from_xml(nxml, args.ports_http, args.ports_https))
+    for nxml in args.nessus_xml:
+        urls.update(targets.nessus.from_xml(nxml, args.ports_http, args.ports_https))
 
     # The session will dedupe URLs. We add failed URLs back in if requested.
     session = screen.session.WebShooterSession(args.session, urls)
@@ -78,6 +77,7 @@ def run():
     scan_parser = subparsers.add_parser('scan', help='Screenshot urls')
     scan_parser.set_defaults(handle=handle_scan)
     scan_parser.add_argument('-x', '--nmap-xml', action='append', default=[], dest='nmap_xml', help='nmap xml')
+    scan_parser.add_argument('--nessus-xml', action='append', default=[], dest='nessus_xml', help='nessus xml')
     scan_parser.add_argument('-u', '--url-file', action='append', default=[], dest='url_file', help='urls 1 per line. include scheme')
     scan_parser.add_argument('-n', '--node-path', dest='node_path', default=None, help='nodejs path')
     scan_parser.add_argument('-w', '--threads', default=5, type=int, help='number of concurrent screenshots to take. default 5')
