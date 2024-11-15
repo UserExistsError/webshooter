@@ -34,7 +34,7 @@ def install_node():
         filename = os.path.basename(url)
         bin_dir = None
         extract_dir = None
-        node_dir = os.path.join('webshooter', 'screen', 'nodejs')
+        node_dir = os.path.join('src', 'webshooter', 'screen', 'nodejs')
         if os.path.exists(node_dir):
             raise FileExistsError(f'Did not expect to find directory: {node_dir}')
         print('Downloading from', url)
@@ -57,7 +57,7 @@ def install_node():
         npm_env['PATH'] = os.path.abspath(bin_dir) + sep + os.environ['PATH']
 
     cwd = os.getcwd()
-    os.chdir(os.path.join('webshooter', 'screen'))
+    os.chdir(os.path.join('src', 'webshooter', 'screen'))
     print('Running `npm install`')
     # see https://docs.python.org/3/library/subprocess.html#subprocess.Popen
     npm_path = shutil.which('npm', path=npm_env['PATH'])

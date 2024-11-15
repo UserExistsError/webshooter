@@ -1,5 +1,5 @@
 const puppeteer = require('puppeteer');
-const devices = puppeteer.devices;
+const devices = puppeteer.KnownDevices;
 
 const express = require('express');
 const app = express();
@@ -78,9 +78,7 @@ app.post('/capture', async (req, res) => {
     // the default browser context since in that case, we can't close the context like we
     // do for incognito mode.
     await page.close();
-    if (context.isIncognito()) {
-        context.close().catch(() => {/* browser was probably closed */});
-    }
+    context.close().catch(() => {/* browser was probably closed */});
 });
 
 app.post('/shutdown', async (req, res) => {
@@ -118,19 +116,25 @@ var server = app.listen(port, '127.0.0.1', () => {
 
 async function getBrowserContext() {
     // Must call close() on returned context when finished
-    const config = {};
+    const config = {
+        downloadBehavior: {
+            policy: 'deny'
+        }
+    };
     if (typeof process.env.WEBSHOOTER_PROXY !== 'undefined') {
         config.proxyServer = process.env.WEBSHOOTER_PROXY;
     }
     const browser = await getBrowser();
-    const context = await browser.createIncognitoBrowserContext(config);
+    const context = await browser.createBrowserContext(config);
     return context;
 }
 
 const getBrowser = function() {
     let browser = undefined;
     const launchArgs = {
-        args: [],
+        args: [
+            '--no-sandbox'
+        ],
         headless: true,
         userDataDir: undefined,
         ignoreHTTPSErrors: true,
@@ -139,11 +143,11 @@ const getBrowser = function() {
             height: viewPortDims.height
         }
     };
-    if (process.env.WEBSHOOTER_DOCKER === 'yes') {
-        // This was necessary even after following the docs
-        // https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-in-docker
-        launchArgs.args.push('--no-sandbox');
-    }
+    // if (process.env.WEBSHOOTER_DOCKER === 'yes') {
+    //     // This was necessary even after following the docs
+    //     // https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-in-docker
+    //     launchArgs.args.push('--no-sandbox');
+    // }
     if (typeof process.env.WEBSHOOTER_PROXY !== 'undefined') {
         // this probably isn't necessary since we specify the proxy for each new window that is opened
         launchArgs.args.push(`--proxy-server=${process.env.WEBSHOOTER_PROXY}`);
