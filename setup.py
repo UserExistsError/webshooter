@@ -2,15 +2,14 @@ import shutil
 import os.path
 import subprocess
 from setuptools import setup
-from setuptools.command.install import install as default_install
+from setuptools.command.build import build as default_build
 
-
-class Install(default_install):
+class Build(default_build):
     ''' Overrides the default install command to ensure NodeJS dependencies are installed '''
     description = 'Install Webshooter and dependencies'
     def run(self):
         install_node()
-        default_install.run(self)
+        default_build.run(self)
 
 def install_node():
     def get_download_url(NODE_VERSION='v20.16.0'):
@@ -71,6 +70,6 @@ def install_node():
 
 setup(
     cmdclass={
-        'install': Install
+        'build': Build
     }
 )
