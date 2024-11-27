@@ -100,3 +100,6 @@ page.*.html
 index.html
 tmp/
 .vscode/
+nodejs/
+*.zip
+*.tar.xz

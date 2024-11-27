@@ -1,4 +1,5 @@
 recursive-include src/webshooter/screen *.json *.js
 graft src/webshooter/screen/node_modules/
+graft src/webshooter/screen/nodejs/
 recursive-include src/webshooter/report *.html *.css *.js
 recursive-exclude src/webshooter __pycache__
