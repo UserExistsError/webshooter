@@ -137,7 +137,7 @@ const getBrowser = function() {
         ],
         headless: true,
         userDataDir: undefined,
-        ignoreHTTPSErrors: true,
+        acceptInsecureCerts: true,
         defaultViewport: {
             width: viewPortDims.width,
             height: viewPortDims.height

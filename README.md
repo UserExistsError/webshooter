@@ -8,7 +8,16 @@ Take screenshots of web sites and generate an HTML report. This tool waits a spe
 
 ### pip
 
-You can install with `pip` after cloning the repository:
+You can install with `pip` after cloning the repository. It's recommended to install in a virtual environment.
+
+Optional: Create a virtual environment first:
+
+```
+python3 -m venv "${HOME}/.webshooter"
+source "${HOME}/.webshooter/bin/activate"
+```
+
+Install with `pip`:
 
 ```
 pip install .
@@ -45,7 +54,7 @@ docker build -t webshooter .
 Then run with:
 
 ```
-docker run -it -p 127.0.0.1:8000:8000/tcp webshooter
+docker run --rm -it -p 127.0.0.1:8000:8000/tcp webshooter
 ```
 
 After generating a report, you can access it outside the container with:
